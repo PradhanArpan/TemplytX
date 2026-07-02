@@ -1,0 +1,134 @@
+/* ==========================================================================
+   TemplytX design tokens — "Instrument, not stationery"
+   Ink-blue precision instrument. Serif for the author's words, sans for the
+   chrome. The readiness gauge is the one bold element; everything else quiet.
+   ========================================================================== */
+
+:root {
+  /* --- surfaces: warm off-white, paper-adjacent --- */
+  --color-bg:        #FBFBFA;   /* page canvas */
+  --color-surface:   #FFFFFF;   /* cards, panels */
+  --color-surface-2: #F5F5F3;   /* recessed / hover */
+  --color-border:    #E7E6E2;   /* warm hairline */
+  --color-border-strong: #D6D5D0;
+
+  /* --- text --- */
+  --color-text:      #1A1A19;
+  --color-muted:     #6B6A66;
+  --color-faint:     #9A9A96;
+
+  /* --- the single accent: ink blue --- */
+  --color-accent:    #185FA5;
+  --color-accent-hover: #124a82;
+  --color-accent-bg: #E6F1FB;   /* tinted surface for accent contexts */
+  --color-accent-text: #0C447C; /* text on accent-bg */
+
+  /* --- status: the product's core signal --- */
+  --status-ready:    #0F6E56;   /* deep teal-green */
+  --status-ready-bg: #E1F5EE;
+  --status-partial:  #854F0B;   /* amber */
+  --status-partial-bg: #FAEEDA;
+  --status-error:    #A32D2D;   /* red */
+  --status-error-bg: #FCEBEB;
+  --status-none:     #9A9A96;
+
+  /* --- typography: serif = author's voice, sans = instrument chrome --- */
+  --font-document: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-ui:       'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:     'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* type scale */
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   22px;
+  --text-2xl:  28px;
+
+  /* --- spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* --- geometry --- */
+  --radius:    8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* --- motion: quiet, precise --- */
+  --ease: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --dur:  160ms;
+
+  /* --- elevation: barely-there, instrument-flat --- */
+  --shadow-card: 0 1px 2px rgba(26,26,25,0.04), 0 1px 3px rgba(26,26,25,0.06);
+}
+
+/* dark mode: instrument-at-night. cool near-blacks, blue stays luminous */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg:        #17181A;
+    --color-surface:   #1E2023;
+    --color-surface-2: #26282C;
+    --color-border:    #33363B;
+    --color-border-strong: #444951;
+
+    --color-text:      #ECECEA;
+    --color-muted:     #A0A09B;
+    --color-faint:     #6E6E6A;
+
+    --color-accent:    #6BA6E8;
+    --color-accent-hover: #85B7EB;
+    --color-accent-bg: #16324F;
+    --color-accent-text: #B5D4F4;
+
+    --status-ready:    #5DCAA5;
+    --status-ready-bg: #0C3A2E;
+    --status-partial:  #E9B865;
+    --status-partial-bg: #3E2E0E;
+    --status-error:    #E88C8C;
+    --status-error-bg: #3A1A1A;
+    --status-none:     #6E6E6A;
+
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* the author's writing always renders in the document serif */
+.tx-document { font-family: var(--font-document); }
+
+h1, h2, h3, h4 { font-weight: 600; margin: 0; }
+
+a { color: var(--color-accent); text-decoration: none; }
+
+::selection { background: var(--color-accent-bg); }
+
+/* focus ring — visible, instrument-precise */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

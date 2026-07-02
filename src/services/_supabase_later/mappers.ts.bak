@@ -1,0 +1,35 @@
+/**
+ * Maps between Postgres rows (snake_case) and domain types (camelCase).
+ * Kept separate so DB column names never leak into the app.
+ */
+import type { TemplytXDocument } from '../types/document';
+
+export interface DocumentRow {
+  id: string;
+  owner_id: string;
+  title: string;
+  target_template_id: string | null;
+  status: TemplytXDocument['status'];
+  readiness_score: number | null;
+  blocks: TemplytXDocument['blocks'];
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToDocument(
+  row: DocumentRow,
+  references: TemplytXDocument['references'] = [],
+): TemplytXDocument {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    title: row.title,
+    targetTemplateId: row.target_template_id,
+    status: row.status,
+    readinessScore: row.readiness_score,
+    blocks: row.blocks ?? [],
+    references,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}

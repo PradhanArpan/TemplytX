@@ -1,0 +1,40 @@
+/**
+ * Auth service — thin wrapper over Supabase Auth.
+ * UI calls these; when Supabase isn't configured they no-op gracefully so
+ * the mock/demo build doesn't crash.
+ */
+import { supabase, SUPABASE_READY } from '../lib/supabase';
+
+export async function signInWithEmail(email: string, password: string) {
+  if (!SUPABASE_READY || !supabase) throw new Error('Auth not configured');
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.user;
+}
+
+export async function signUpWithEmail(email: string, password: string, fullName?: string) {
+  if (!SUPABASE_READY || !supabase) throw new Error('Auth not configured');
+  const { data, error } = await supabase.auth.signUp({
+    email, password,
+    options: { data: { full_name: fullName } },
+  });
+  if (error) throw error;
+  return data.user;
+}
+
+export async function signInWithGoogle() {
+  if (!SUPABASE_READY || !supabase) throw new Error('Auth not configured');
+  const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+  if (error) throw error;
+}
+
+export async function signOut() {
+  if (!SUPABASE_READY || !supabase) return;
+  await supabase.auth.signOut();
+}
+
+export async function getCurrentUser() {
+  if (!SUPABASE_READY || !supabase) return null;
+  const { data } = await supabase.auth.getUser();
+  return data.user;
+}
