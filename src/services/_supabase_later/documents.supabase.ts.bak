@@ -1,0 +1,113 @@
+/**
+ * Document service.
+ *
+ * The UI depends ONLY on these signatures. When Supabase env vars are set,
+ * queries hit the database; otherwise it falls back to an in-memory mock so
+ * the app stays demoable (e.g. a Vercel preview before keys are configured).
+ */
+import { supabase, SUPABASE_READY } from '../lib/supabase';
+import { rowToDocument, type DocumentRow } from './mappers';
+import type { TemplytXDocument } from '../types/document';
+
+const now = () => new Date().toISOString();
+
+// --- in-memory mock store (used only when Supabase is not configured) --------
+let mock: TemplytXDocument[] = [
+  {
+    id: 'doc-1', ownerId: 'me',
+    title: 'Thermal analysis of additively manufactured heat sinks',
+    targetTemplateId: 'tpl-ieee', status: 'ready', readinessScore: 100,
+    blocks: [], references: [], createdAt: now(), updatedAt: now(),
+  },
+  {
+    id: 'doc-2', ownerId: 'me',
+    title: 'CFD study of urban canyon ventilation',
+    targetTemplateId: 'tpl-elsevier', status: 'checked', readinessScore: 72,
+    blocks: [], references: [], createdAt: now(), updatedAt: now(),
+  },
+  {
+    id: 'doc-3', ownerId: 'me',
+    title: 'PhD Chapter 3 — Numerical methods',
+    targetTemplateId: 'tpl-thesis', status: 'draft', readinessScore: null,
+    blocks: [], references: [], createdAt: now(), updatedAt: now(),
+  },
+];
+
+export async function listDocuments(): Promise<TemplytXDocument[]> {
+  if (!SUPABASE_READY || !supabase) {
+    return [...mock].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  const { data, error } = await supabase
+    .from('documents').select('*').order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data as DocumentRow[]).map((r) => rowToDocument(r));
+}
+
+export async function getDocument(id: string): Promise<TemplytXDocument | null> {
+  if (!SUPABASE_READY || !supabase) {
+    return mock.find((d) => d.id === id) ?? null;
+  }
+  const { data, error } = await supabase
+    .from('documents').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: refs, error: refErr } = await supabase
+    .from('document_references')
+    .select('id, csl_json, position')
+    .eq('document_id', id)
+    .order('position');
+  if (refErr) throw refErr;
+
+  return rowToDocument(data as DocumentRow,
+    (refs ?? []).map((r) => ({ id: r.id, cslJson: r.csl_json, position: r.position })));
+}
+
+export async function createDocument(
+  input: Pick<TemplytXDocument, 'title' | 'targetTemplateId'>,
+): Promise<TemplytXDocument> {
+  if (!SUPABASE_READY || !supabase) {
+    const doc: TemplytXDocument = {
+      id: `doc-${crypto.randomUUID()}`, ownerId: 'me',
+      title: input.title, targetTemplateId: input.targetTemplateId,
+      status: 'draft', readinessScore: null, blocks: [], references: [],
+      createdAt: now(), updatedAt: now(),
+    };
+    mock = [doc, ...mock];
+    return doc;
+  }
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('documents')
+    .insert({
+      owner_id: auth.user?.id,
+      title: input.title,
+      target_template_id: input.targetTemplateId,
+    })
+    .select('*').single();
+  if (error) throw error;
+  return rowToDocument(data as DocumentRow);
+}
+
+export async function updateDocument(
+  id: string, patch: Partial<TemplytXDocument>,
+): Promise<TemplytXDocument> {
+  if (!SUPABASE_READY || !supabase) {
+    mock = mock.map((d) => d.id === id ? { ...d, ...patch, updatedAt: now() } : d);
+    const updated = mock.find((d) => d.id === id);
+    if (!updated) throw new Error(`Document ${id} not found`);
+    return updated;
+  }
+  // Only map fields the UI is allowed to patch; never touch owner_id.
+  const row: Record<string, unknown> = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.targetTemplateId !== undefined) row.target_template_id = patch.targetTemplateId;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.readinessScore !== undefined) row.readiness_score = patch.readinessScore;
+  if (patch.blocks !== undefined) row.blocks = patch.blocks;
+
+  const { data, error } = await supabase
+    .from('documents').update(row).eq('id', id).select('*').single();
+  if (error) throw error;
+  return rowToDocument(data as DocumentRow);
+}
