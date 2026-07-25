@@ -32,7 +32,8 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         return `<h2 class="sec">${n}${esc(b.title)}</h2>`;
       }
       case 'paragraph':
-        return `<p>${esc(renderCitations(b.content, markers))}</p>`;
+        // content is HTML (rich text); render as-is, resolving citation tokens.
+        return `<p>${renderCitations(b.content, markers)}</p>`;
       case 'equation': {
         const n = num.equations.get(b.id);
         let math = '';

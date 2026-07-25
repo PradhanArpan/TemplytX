@@ -16,6 +16,37 @@ import { listReferencesSync } from '../../services/references';
 
 const lineMap = { single: 240, onehalf: 360, double: 480 };
 
+/** Convert a rich-text HTML string into docx TextRuns, preserving
+ *  bold/italic/superscript/subscript. Citations already resolved to text. */
+function htmlToRuns(html: string, size: number): TextRun[] {
+  const runs: TextRun[] = [];
+  if (typeof document === 'undefined') {
+    // SSR/Node fallback: strip tags.
+    return [new TextRun({ text: html.replace(/<[^>]+>/g, ''), size })];
+  }
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const walk = (node: Node, fmt: { bold?: boolean; italics?: boolean; superScript?: boolean; subScript?: boolean }) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent ?? '';
+        if (text) runs.push(new TextRun({ text, size, ...fmt }));
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+        const next = { ...fmt };
+        if (tag === 'b' || tag === 'strong') next.bold = true;
+        if (tag === 'i' || tag === 'em') next.italics = true;
+        if (tag === 'sup') next.superScript = true;
+        if (tag === 'sub') next.subScript = true;
+        walk(el, next);
+      }
+    });
+  };
+  walk(container, {});
+  return runs.length ? runs : [new TextRun({ text: '', size })];
+}
+
 export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
   const fmt = tpl.formatting;
   const num = computeNumbering(doc.blocks, fmt.numberSections);
@@ -68,7 +99,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
     } else if (b.type === 'paragraph') {
       children.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        children: [new TextRun({ text: renderCitations(b.content, markers), size: half })],
+        children: htmlToRuns(renderCitations(b.content, markers), half),
         spacing: { after: 120, line: lineMap[fmt.lineSpacing] },
       }));
     } else if (b.type === 'equation') {

@@ -3,9 +3,10 @@
  * Each block renders as an editable element in the author's serif.
  * Equations render live with KaTeX (click to edit, blur to render).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { RichParagraph } from './RichParagraph';
 import type {
   DocumentBlock, SectionBlock, ParagraphBlock,
   EquationBlock, FigureBlock, TableBlock,
@@ -54,23 +55,12 @@ export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlo
 export function ParagraphView({ block, onChange, onDelete, onFocusCursor }: BlockProps<ParagraphBlock> & {
   onFocusCursor?: (blockId: string, getCursor: () => number) => void;
 }) {
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  // Grow to fit content on mount and whenever content changes (e.g. on load).
-  useEffect(() => {
-    const el = taRef.current;
-    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
-  }, [block.content]);
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
-      <textarea ref={taRef} value={block.content} placeholder="Write… (cite from the References panel)"
-        rows={1}
-        onFocus={() => onFocusCursor?.(block.id, () => taRef.current?.selectionStart ?? block.content.length)}
-        onChange={(e) => {
-          onChange({ content: e.target.value } as Partial<ParagraphBlock>);
-          const el = e.target; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`;
-        }}
-        onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }}
-        style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 16, lineHeight: 1.7, overflow: 'hidden' }} />
+      <RichParagraph html={block.content}
+        blockId={block.id}
+        onChange={(content) => onChange({ content } as Partial<ParagraphBlock>)}
+        onFocusCursor={(bid) => onFocusCursor?.(bid, () => 0)} />
     </BlockShell>
   );
 }

@@ -119,11 +119,21 @@ export function EditorScreen() {
     if (!c) return; // no paragraph focused
     const target = blocks.find((b) => b.id === c.blockId);
     if (!target || target.type !== 'paragraph') return;
-    const pos = c.get();
-    const text = target.content;
     const token = `[[cite:${ref.id}]]`;
-    const next = text.slice(0, pos) + token + text.slice(pos);
-    patchBlock(c.blockId, { content: next } as Partial<DocumentBlock>);
+    // Insert at the caret inside the focused contentEditable, if the selection
+    // is within this block; otherwise append to the block's content.
+    const el = document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null;
+    const sel = window.getSelection();
+    if (el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode(token));
+      range.collapse(false);
+      patchBlock(c.blockId, { content: el.innerHTML } as Partial<DocumentBlock>);
+    } else {
+      const cur = target.content;
+      patchBlock(c.blockId, { content: `${cur} ${token}` } as Partial<DocumentBlock>);
+    }
     setPool((p) => (p.some((r) => r.id === ref.id) ? p : [...p, ref]));
   }
 

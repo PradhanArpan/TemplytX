@@ -11,7 +11,9 @@ import type { SectionBlock, ParagraphBlock } from '../../../types/document';
 
 /** Count words in a rich-text paragraph's ProseMirror JSON (best-effort). */
 function countWords(node: unknown): number {
-  const text = JSON.stringify(node ?? '');
+  const text = String(node ?? '')
+    .replace(/<[^>]+>/g, ' ')            // strip HTML tags
+    .replace(/\[\[cite:[a-z0-9-]+\]\]/gi, ' '); // strip citation tokens
   const matches = text.match(/[A-Za-z]+/g);
   return matches ? matches.length : 0;
 }
@@ -61,7 +63,7 @@ const figureCitedInText: Rule = {
 
     const bodyText = blocks
       .filter((b) => b.type === 'paragraph')
-      .map((b) => JSON.stringify((b as ParagraphBlock).content))
+      .map((b) => (b as ParagraphBlock).content.replace(/<[^>]+>/g, ' '))
       .join(' ')
       .toLowerCase();
 
