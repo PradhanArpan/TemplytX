@@ -1,16 +1,13 @@
 /**
- * ReadinessGauge — the product's signature element.
- *
- * A precision-instrument dial showing how submission-ready a document is.
- * Color shifts with the score: amber/red when work remains, teal-green at
- * ready. The one deliberately bold element in the whole UI.
+ * ReadinessGauge — the signature element, now animated.
+ * The arc sweeps to its value on mount/change; the number counts up.
  */
+import { motion, useSpring, useTransform, animate } from 'framer-motion';
+import { useEffect, useState } from 'react';
 
 interface ReadinessGaugeProps {
-  /** 0–100, or null when never checked. */
   score: number | null;
   size?: number;
-  /** Marks the score visually as outdated after edits. */
   stale?: boolean;
 }
 
@@ -26,8 +23,22 @@ export function ReadinessGauge({ score, size = 112, stale = false }: ReadinessGa
   const cx = size / 2;
   const circumference = 2 * Math.PI * r;
   const pct = score ?? 0;
-  const offset = circumference * (1 - pct / 100);
-  const arcColor = score === null ? 'var(--color-border-strong)' : colorFor(score);
+
+  const spring = useSpring(0, { stiffness: 60, damping: 16 });
+  const dashOffset = useTransform(spring, (v) => circumference * (1 - v / 100));
+  const [displayed, setDisplayed] = useState(0);
+
+  useEffect(() => {
+    spring.set(pct);
+    const controls = animate(displayed, pct, {
+      duration: 0.7, ease: 'easeOut',
+      onUpdate: (v) => setDisplayed(Math.round(v)),
+    });
+    return () => controls.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pct]);
+
+  const arcColor = score === null ? 'var(--color-border-strong)' : colorFor(pct);
 
   return (
     <svg
@@ -36,24 +47,24 @@ export function ReadinessGauge({ score, size = 112, stale = false }: ReadinessGa
       aria-label={score === null ? 'Not checked yet' : `Readiness ${pct} percent`}
       style={{ opacity: stale ? 0.5 : 1, transition: 'opacity var(--dur) var(--ease)' }}
     >
-      <circle cx={cx} cy={cx} r={r} fill="none"
-        stroke="var(--color-border)" strokeWidth={stroke} />
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--color-border)" strokeWidth={stroke} />
       {score !== null && (
-        <circle cx={cx} cy={cx} r={r} fill="none"
+        <motion.circle
+          cx={cx} cy={cx} r={r} fill="none"
           stroke={arcColor} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={circumference} strokeDashoffset={offset}
+          strokeDasharray={circumference}
+          style={{ strokeDashoffset: dashOffset }}
           transform={`rotate(-90 ${cx} ${cx})`}
-          style={{ transition: 'stroke-dashoffset 400ms var(--ease), stroke var(--dur) var(--ease)' }} />
+        />
       )}
       <text x={cx} y={cx - size * 0.03} textAnchor="middle"
         fontFamily="var(--font-ui)" fontSize={size * 0.24} fontWeight={600}
         fill="var(--color-text)">
-        {score === null ? '—' : pct}
+        {score === null ? '—' : displayed}
       </text>
       {score !== null && (
         <text x={cx} y={cx + size * 0.16} textAnchor="middle"
-          fontFamily="var(--font-ui)" fontSize={size * 0.1}
-          fill="var(--color-faint)">
+          fontFamily="var(--font-ui)" fontSize={size * 0.1} fill="var(--color-faint)">
           percent
         </text>
       )}

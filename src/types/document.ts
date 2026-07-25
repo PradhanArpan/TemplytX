@@ -35,8 +35,8 @@ export interface SectionBlock extends BaseBlock {
 
 export interface ParagraphBlock extends BaseBlock {
   type: 'paragraph';
-  /** Rich text stored as ProseMirror/TipTap JSON. */
-  content: unknown;
+  /** Plain text for V1. Rich text (TipTap JSON) can replace this later. */
+  content: string;
 }
 
 export interface EquationBlock extends BaseBlock {

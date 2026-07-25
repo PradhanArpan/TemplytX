@@ -1,0 +1,26 @@
+TemplytX — editor + premium polish (two phases, one update)
+===========================================================
+This bundle contains BOTH the block editor phase and the premium polish
+phase (18 files). Copy everything over your templytx/ folder, preserving
+paths. It replaces the earlier "editor-changes" zip — use this instead.
+
+New libraries added (katex, tailwindcss, framer-motion, lucide-react, cmdk),
+so after copying run:
+
+  npm install
+  git add .
+  git commit -m "Add block editor + premium polish (design system, dark mode, command palette)"
+  git push origin main
+
+Vercel rebuilds automatically (~1 min).
+
+What you'll see on the live site:
+- Dashboard: cards animate in, hover-lift, skeleton loading, empty state
+- Dark mode: moon/sun toggle in the header (persists)
+- Command palette: press Ctrl+K anywhere — search docs, run actions
+- Editor: write in blocks (sections/text/equations/figures/tables),
+  live LaTeX equations, autosave, animated readiness gauge
+- Compliance: open "CFD study of urban canyon ventilation", click
+  Check compliance -> 82% with an uncited-figure issue. Type
+  "Figure 1 shows the domain." into the Methods paragraph, Re-check,
+  and watch the gauge sweep to 100 and turn green.

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { FileText, Plus } from 'lucide-react';
 import { listDocuments, createDocument, listTemplates } from '../../services/documents';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
+import { Card, Skeleton, EmptyState } from '../../components/ui/Card';
 
 function statusTone(status: string): 'ready' | 'partial' | 'none' {
   return status === 'ready' ? 'ready' : status === 'checked' ? 'partial' : 'none';
@@ -13,11 +16,16 @@ function statusLabel(d: TemplytXDocument): string {
   if (d.status === 'checked') return 'Issues remain';
   return 'Not checked';
 }
+function scoreColor(d: TemplytXDocument): string {
+  if (d.readinessScore === null) return 'var(--color-faint)';
+  return d.status === 'ready' ? 'var(--status-ready)' : 'var(--status-partial)';
+}
 
 export function DashboardScreen() {
-  const [docs, setDocs] = useState<TemplytXDocument[]>([]);
+  const [docs, setDocs] = useState<TemplytXDocument[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [creating, setCreating] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const [creating, setCreating] = useState(params.get('new') === '1');
   const [title, setTitle] = useState('');
   const [templateId, setTemplateId] = useState('');
   const navigate = useNavigate();
@@ -27,88 +35,107 @@ export function DashboardScreen() {
     listTemplates().then((t) => { setTemplates(t); setTemplateId(t[0]?.id ?? ''); });
   }, []);
 
+  useEffect(() => {
+    if (params.get('new') === '1') { setCreating(true); setParams({}, { replace: true }); }
+  }, [params, setParams]);
+
   async function handleCreate() {
     const doc = await createDocument({ title: title.trim(), targetTemplateId: templateId || null });
     navigate(`/doc/${doc.id}`);
   }
 
-  const inputStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-ui)', fontSize: 'var(--text-base)',
-    padding: '9px 11px', border: '1px solid var(--color-border-strong)',
-    borderRadius: 'var(--radius)', background: 'var(--color-surface)',
-    color: 'var(--color-text)',
-  };
+  const inputCls =
+    'text-[14px] px-3 py-2.5 border border-[var(--color-border-strong)] rounded-[var(--radius)] ' +
+    'bg-[var(--color-surface)] text-[var(--color-text)] outline-none ' +
+    'focus:border-[var(--color-accent)] transition-colors';
 
   return (
-    <div style={{ maxWidth: 780, margin: '0 auto', padding: 'var(--space-10) var(--space-6)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 'var(--space-6)' }}>
+    <div className="max-w-[780px] mx-auto px-6 py-10">
+      <div className="flex justify-between items-end mb-6">
         <div>
-          <h1 style={{ fontSize: 'var(--text-2xl)', letterSpacing: '-0.02em' }}>Your documents</h1>
-          <p style={{ color: 'var(--color-muted)', margin: '6px 0 0', fontSize: 'var(--text-md)' }}>
-            {docs.length} document{docs.length === 1 ? '' : 's'}
+          <motion.h1
+            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="text-[28px] font-semibold tracking-tight"
+          >
+            Your documents
+          </motion.h1>
+          <p className="text-[var(--color-muted)] mt-1.5 text-[16px]">
+            {docs === null ? '…' : `${docs.length} document${docs.length === 1 ? '' : 's'}`}
           </p>
         </div>
         <Button variant={creating ? 'secondary' : 'primary'} onClick={() => setCreating((v) => !v)}>
-          {creating ? 'Cancel' : '+ New document'}
+          {creating ? 'Cancel' : <><Plus size={15} /> New document</>}
         </Button>
       </div>
 
       {creating && (
-        <div style={{
-          border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-4)', marginBottom: 'var(--space-6)',
-          background: 'var(--color-surface)', boxShadow: 'var(--shadow-card)',
-          display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap',
-        }}>
-          <input autoFocus placeholder="Document title" value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-            style={{ ...inputStyle, flex: 1, minWidth: 220 }} />
-          <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} style={inputStyle}>
-            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <Button variant="primary" onClick={handleCreate}>Create</Button>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="overflow-hidden mb-6"
+        >
+          <Card className="p-4 flex gap-3 items-center flex-wrap">
+            <input autoFocus placeholder="Document title" value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+              className={`${inputCls} flex-1 min-w-[220px]`} />
+            <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls}>
+              {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <Button variant="primary" onClick={handleCreate}>Create</Button>
+          </Card>
+        </motion.div>
+      )}
+
+      {docs === null && (
+        <div className="flex flex-col gap-3">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[86px]" />)}
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {docs.map((d) => {
-          const tpl = templates.find((t) => t.id === d.targetTemplateId);
-          return (
-            <button key={d.id} onClick={() => navigate(`/doc/${d.id}`)}
-              style={{
-                textAlign: 'left', cursor: 'pointer', width: '100%',
-                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4) var(--space-5)', background: 'var(--color-surface)',
-                boxShadow: 'var(--shadow-card)', transition: 'border-color var(--dur) var(--ease)',
-                display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-strong)')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tx-document" style={{
-                  fontSize: 'var(--text-lg)', fontWeight: 500, color: 'var(--color-text)',
-                  marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {d.title}
-                </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-                  <Badge tone="accent">{tpl?.name ?? 'No template'}</Badge>
-                  <Badge tone={statusTone(d.status)}>{statusLabel(d)}</Badge>
-                </div>
-              </div>
-              <div style={{
-                fontVariantNumeric: 'tabular-nums', fontSize: 'var(--text-xl)', fontWeight: 600,
-                color: d.readinessScore === null ? 'var(--color-faint)'
-                  : d.status === 'ready' ? 'var(--status-ready)' : 'var(--status-partial)',
-                minWidth: 52, textAlign: 'right',
-              }}>
-                {d.readinessScore === null ? '—' : `${d.readinessScore}%`}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {docs !== null && docs.length === 0 && (
+        <EmptyState
+          icon={<FileText size={36} strokeWidth={1.5} />}
+          title="No documents yet"
+          hint="Create your first document and pick a submission target to get started."
+          action={<Button variant="primary" onClick={() => setCreating(true)}><Plus size={15} /> New document</Button>}
+        />
+      )}
+
+      {docs !== null && docs.length > 0 && (
+        <motion.div
+          className="flex flex-col gap-3"
+          initial="hidden" animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+        >
+          {docs.map((d) => {
+            const tpl = templates.find((t) => t.id === d.targetTemplateId);
+            return (
+              <motion.div key={d.id}
+                variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+              >
+                <Card onClick={() => navigate(`/doc/${d.id}`)} className="p-5 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="tx-document text-[18px] font-medium text-[var(--color-text)] mb-2 truncate">
+                      {d.title}
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <Badge tone="accent">{tpl?.name ?? 'No template'}</Badge>
+                      <Badge tone={statusTone(d.status)}>{statusLabel(d)}</Badge>
+                    </div>
+                  </div>
+                  <div className="tabular-nums text-[22px] font-semibold min-w-[52px] text-right"
+                    style={{ color: scoreColor(d) }}>
+                    {d.readinessScore === null ? '—' : `${d.readinessScore}%`}
+                  </div>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
     </div>
   );
 }
