@@ -4,33 +4,10 @@
  * (including a deliberately-uncited figure) so the compliance loop demos.
  */
 import type { TemplytXDocument, DocumentBlock } from '../types/document';
-import type { Template } from '../types/compliance';
 
 const now = () => new Date().toISOString();
 
-export const mockTemplates: Template[] = [
-  { id: 'tpl-ieee', name: 'IEEE Conference', publisher: 'IEEE', citationStyle: 'ieee',
-    layoutSpec: { columns: 2 }, isActive: true,
-    rules: [
-      { ruleId: 'abstract-word-limit', severity: 'warning', params: { maxWords: 250 } },
-      { ruleId: 'figure-cited-in-text', severity: 'error' } ] },
-  { id: 'tpl-springer', name: 'Springer Nature', publisher: 'Springer', citationStyle: 'springer',
-    layoutSpec: { columns: 1 }, isActive: true,
-    rules: [
-      { ruleId: 'abstract-word-limit', severity: 'warning', params: { maxWords: 250 } },
-      { ruleId: 'figure-cited-in-text', severity: 'error' } ] },
-  { id: 'tpl-elsevier', name: 'Elsevier', publisher: 'Elsevier', citationStyle: 'elsevier',
-    layoutSpec: { columns: 1 }, isActive: true,
-    rules: [
-      { ruleId: 'abstract-word-limit', severity: 'warning', params: { maxWords: 300 } },
-      { ruleId: 'figure-cited-in-text', severity: 'error' } ] },
-  { id: 'tpl-apa7', name: 'APA 7', publisher: 'APA', citationStyle: 'apa-7',
-    layoutSpec: { columns: 1 }, isActive: true,
-    rules: [{ ruleId: 'figure-cited-in-text', severity: 'warning' }] },
-  { id: 'tpl-thesis', name: 'Generic Thesis', publisher: 'University', citationStyle: 'apa-7',
-    layoutSpec: { columns: 1 }, isActive: true,
-    rules: [{ ruleId: 'figure-cited-in-text', severity: 'warning' }] },
-];
+export { templateCatalog as mockTemplates } from './templates';
 
 const doc2Blocks: DocumentBlock[] = [
   { id: 'b-1', type: 'section', level: 1, title: 'Abstract' },

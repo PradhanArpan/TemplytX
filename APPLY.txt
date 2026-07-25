@@ -1,26 +1,30 @@
-TemplytX — editor + premium polish (two phases, one update)
-===========================================================
-This bundle contains BOTH the block editor phase and the premium polish
-phase (18 files). Copy everything over your templytx/ folder, preserving
-paths. It replaces the earlier "editor-changes" zip — use this instead.
-
-New libraries added (katex, tailwindcss, framer-motion, lucide-react, cmdk),
-so after copying run:
+TemplytX — Export + structured templates
+========================================
+Copy these files over your templytx/ folder, preserving paths.
+This phase adds new libraries (docx, file-saver), so after copying:
 
   npm install
   git add .
-  git commit -m "Add block editor + premium polish (design system, dark mode, command palette)"
+  git commit -m "Add PDF + Word export and structured templates"
   git push origin main
 
-Vercel rebuilds automatically (~1 min).
+WHAT'S NEW ON YOUR SITE
+- Export finally WORKS. Open any document -> Export -> choose PDF or Word:
+    * PDF: opens a print-ready manuscript in a new tab (allow pop-ups),
+      formatted to the template (paper size, columns, spacing, font,
+      numbered sections) with auto-numbered Figures/Tables/Equations.
+      Click "Save as PDF".
+    * Word (.docx): downloads a real editable Word file in the same format.
+- Templates are now STRUCTURED and cover four document kinds, not just
+  journals: Journals (IEEE, Springer, Elsevier), PhD Thesis, Technical
+  Report, Grant/Research Proposal. The New Document dropdown groups them.
+- Each template has a required-section skeleton. "Check compliance" now
+  also flags missing required sections (e.g. Springer needs Declarations).
 
-What you'll see on the live site:
-- Dashboard: cards animate in, hover-lift, skeleton loading, empty state
-- Dark mode: moon/sun toggle in the header (persists)
-- Command palette: press Ctrl+K anywhere — search docs, run actions
-- Editor: write in blocks (sections/text/equations/figures/tables),
-  live LaTeX equations, autosave, animated readiness gauge
-- Compliance: open "CFD study of urban canyon ventilation", click
-  Check compliance -> 82% with an uncited-figure issue. Type
-  "Figure 1 shows the domain." into the Methods paragraph, Re-check,
-  and watch the gauge sweep to 100 and turn green.
+TRY IT
+Create a "Grant / Research Proposal", add a couple of its sections, export
+to Word — you get a formatted .docx with numbered sections. Or open the CFD
+journal doc and export to PDF to see two-column-capable manuscript output.
+
+NOTE ON POP-UPS: PDF export opens a new browser tab. If nothing happens,
+allow pop-ups for your site once.

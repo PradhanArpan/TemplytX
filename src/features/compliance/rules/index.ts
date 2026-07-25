@@ -87,4 +87,33 @@ const figureCitedInText: Rule = {
   },
 };
 
-export const RULES: Rule[] = [abstractWordLimit, figureCitedInText];
+/** Required sections from the template skeleton must be present (by title). */
+const requiredSections: Rule = {
+  id: 'required-sections',
+  label: 'All required sections are present',
+  run: ({ blocks, params }): ComplianceIssue[] => {
+    const required = (params.required as string[] | undefined) ?? [];
+    if (required.length === 0) return [];
+    const present = new Set(
+      blocks
+        .filter((b) => b.type === 'section')
+        .map((b) => (b as SectionBlock).title.trim().toLowerCase()),
+    );
+    const issues: ComplianceIssue[] = [];
+    for (const title of required) {
+      if (!present.has(title.trim().toLowerCase())) {
+        issues.push({
+          id: `required-sections:${title}`,
+          ruleId: 'required-sections',
+          severity: 'error',
+          message: `Required section "${title}" is missing`,
+          autoFixable: false,
+          resolved: false,
+        });
+      }
+    }
+    return issues;
+  },
+};
+
+export const RULES: Rule[] = [abstractWordLimit, figureCitedInText, requiredSections];

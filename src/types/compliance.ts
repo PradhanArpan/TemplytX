@@ -10,14 +10,48 @@ import type { DocumentBlock, Reference } from './document';
 
 export type CitationStyle = 'ieee' | 'apa-7' | 'springer' | 'elsevier';
 
-/** A submission target the user formats toward. */
+/** What kind of document this template produces. Journals are the wedge;
+ *  the platform serves many document kinds. */
+export type TemplateType = 'journal' | 'thesis' | 'report' | 'proposal';
+
+/** Who owns/can see a template. Global = shipped/published by admin;
+ *  private = uploaded by a user (arrives with accounts). */
+export type TemplateScope = 'admin-global' | 'user-private';
+
+/** One entry in a template's ordered section skeleton. Drives three things:
+ *  scaffolding a new document, the "required section missing" check, and the
+ *  order the exporter emits sections. */
+export interface SectionSpec {
+  title: string;        // "Abstract", "Methodology", "Budget"
+  required: boolean;
+  /** Optional guidance shown to the author (from author instructions). */
+  hint?: string;
+}
+
+/** Formatting rules consumed by the export pipeline. Submission/manuscript
+ *  format — NOT the journal's final typeset look. */
+export interface FormattingSpec {
+  paperSize: 'a4' | 'letter';
+  columns: 1 | 2;
+  lineSpacing: 'single' | 'onehalf' | 'double';
+  bodyFont: string;     // e.g. "Times New Roman"
+  bodyFontPt: number;
+  numberSections: boolean;
+}
+
+/** A submission target the user formats toward — now a structured,
+ *  storable spec object, extensible to any document kind. */
 export interface Template {
   id: string;
-  name: string; // "IEEE Conference"
-  publisher: string; // "IEEE"
+  name: string;              // "IEEE Conference"
+  publisher: string;         // "IEEE" (or institution/agency)
+  type: TemplateType;
+  scope: TemplateScope;
   citationStyle: CitationStyle;
-  /** Layout hints consumed by the export pipeline (margins, columns, etc). */
-  layoutSpec: Record<string, unknown>;
+  /** Ordered required/optional sections from the author instructions. */
+  sections: SectionSpec[];
+  /** Manuscript formatting rules for export. */
+  formatting: FormattingSpec;
   /** Rule configuration consumed by the compliance engine. */
   rules: RuleConfig[];
   isActive: boolean;

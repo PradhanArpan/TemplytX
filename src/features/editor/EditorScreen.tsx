@@ -66,7 +66,13 @@ export function EditorScreen() {
 
   async function checkCompliance() {
     if (!doc || !tpl) return;
-    const r = runCompliance({ documentId: doc.id, blocks, references: doc.references, ruleConfigs: tpl.rules });
+    // Feed the template's required section titles into the required-sections rule.
+    const required = tpl.sections.filter((s) => s.required).map((s) => s.title);
+    const ruleConfigs = tpl.rules.map((rc) =>
+      rc.ruleId === 'required-sections'
+        ? { ...rc, params: { ...(rc.params ?? {}), required } }
+        : rc);
+    const r = runCompliance({ documentId: doc.id, blocks, references: doc.references, ruleConfigs });
     setReport(r);
     setStale(false);
     const status = r.score === 100 ? 'ready' : 'checked';
