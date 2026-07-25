@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CircleAlert, CircleCheck, Crosshair } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical } from 'lucide-react';
 import { getDocument, updateDocument, listTemplates } from '../../services/documents';
+import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
-import type { TemplytXDocument, DocumentBlock } from '../../types/document';
+import { orderedReferences, markerMap, renderCitations, formatEntry } from '../references/format';
+import { ReferencePanel } from '../references/ReferencePanel';
+import type { TemplytXDocument, DocumentBlock, Reference } from '../../types/document';
 import type { Template, ComplianceReport } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Card';
@@ -14,10 +17,10 @@ import { BlockView } from './blocks/BlockView';
 const paneLabel =
   'text-[12px] tracking-[0.06em] uppercase text-[var(--color-faint)] font-semibold mb-3';
 
-function newBlock(type: DocumentBlock['type']): DocumentBlock {
+function newBlock(type: DocumentBlock['type'], title = ''): DocumentBlock {
   const id = `b-${crypto.randomUUID()}`;
   switch (type) {
-    case 'section': return { id, type, level: 1, title: '' };
+    case 'section': return { id, type, level: 1, title };
     case 'paragraph': return { id, type, content: '' };
     case 'equation': return { id, type, latex: '' };
     case 'figure': return { id, type, src: '', caption: '' };
@@ -32,10 +35,14 @@ export function EditorScreen() {
   const [doc, setDoc] = useState<TemplytXDocument | null>(null);
   const [tpl, setTpl] = useState<Template | null>(null);
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
+  const [pool, setPool] = useState<Reference[]>([]);
   const [report, setReport] = useState<ComplianceReport | null>(null);
   const [stale, setStale] = useState(false);
   const [saved, setSaved] = useState(true);
+  const [dragId, setDragId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks which paragraph is focused + a getter for the cursor position.
+  const cursor = useRef<{ blockId: string; get: () => number } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -45,6 +52,7 @@ export function EditorScreen() {
       if (d?.targetTemplateId) listTemplates().then((ts) =>
         setTpl(ts.find((t) => t.id === d.targetTemplateId) ?? null));
     });
+    listReferences().then(setPool);
   }, [id]);
 
   const applyBlocks = useCallback((next: DocumentBlock[]) => {
@@ -62,16 +70,48 @@ export function EditorScreen() {
     applyBlocks(blocks.map((b) => (b.id === blockId ? { ...b, ...patch } as DocumentBlock : b)));
   }
   function deleteBlock(blockId: string) { applyBlocks(blocks.filter((b) => b.id !== blockId)); }
-  function addBlock(type: DocumentBlock['type']) { applyBlocks([...blocks, newBlock(type)]); }
+
+  /** Insert a new block at a given index (default: end). */
+  function insertBlock(type: DocumentBlock['type'], at?: number) {
+    const b = newBlock(type);
+    const next = [...blocks];
+    next.splice(at ?? next.length, 0, b);
+    applyBlocks(next);
+  }
+
+  /** Drag reorder: move dragged block to before the drop target. */
+  function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    const from = blocks.findIndex((b) => b.id === dragId);
+    const to = blocks.findIndex((b) => b.id === targetId);
+    if (from === -1 || to === -1) { setDragId(null); return; }
+    const next = [...blocks];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    applyBlocks(next);
+    setDragId(null);
+  }
+
+  /** Cite a reference: insert [[cite:id]] at the cursor in the focused paragraph. */
+  function cite(ref: Reference) {
+    const c = cursor.current;
+    if (!c) return; // no paragraph focused
+    const target = blocks.find((b) => b.id === c.blockId);
+    if (!target || target.type !== 'paragraph') return;
+    const pos = c.get();
+    const text = target.content;
+    const token = `[[cite:${ref.id}]]`;
+    const next = text.slice(0, pos) + token + text.slice(pos);
+    patchBlock(c.blockId, { content: next } as Partial<DocumentBlock>);
+    setPool((p) => (p.some((r) => r.id === ref.id) ? p : [...p, ref]));
+  }
 
   async function checkCompliance() {
     if (!doc || !tpl) return;
-    // Feed the template's required section titles into the required-sections rule.
     const required = tpl.sections.filter((s) => s.required).map((s) => s.title);
     const ruleConfigs = tpl.rules.map((rc) =>
       rc.ruleId === 'required-sections'
-        ? { ...rc, params: { ...(rc.params ?? {}), required } }
-        : rc);
+        ? { ...rc, params: { ...(rc.params ?? {}), required } } : rc);
     const r = runCompliance({ documentId: doc.id, blocks, references: doc.references, ruleConfigs });
     setReport(r);
     setStale(false);
@@ -87,9 +127,9 @@ export function EditorScreen() {
 
   if (!doc) {
     return (
-      <div className="grid grid-cols-[190px_1fr_276px] h-[calc(100vh-56px)]">
+      <div className="grid grid-cols-[210px_1fr_276px] h-[calc(100vh-56px)]">
         <div className="border-r border-[var(--color-border)] p-5"><Skeleton className="h-5 w-24 mb-4" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-3/4" /></div>
-        <div className="p-10"><Skeleton className="h-7 w-2/3 mb-6" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></div>
+        <div className="p-10"><Skeleton className="h-7 w-2/3 mb-6" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></div>
         <div className="border-l border-[var(--color-border)] p-5 flex flex-col items-center"><Skeleton className="h-28 w-28 rounded-full mb-4" /><Skeleton className="h-9 w-full" /></div>
       </div>
     );
@@ -97,6 +137,8 @@ export function EditorScreen() {
 
   const sections = blocks.filter((b) => b.type === 'section');
   const score = report ? report.score : doc.readinessScore;
+  const markers = markerMap(blocks, pool, tpl);
+  const refList = orderedReferences(blocks, pool, tpl);
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
@@ -112,10 +154,8 @@ export function EditorScreen() {
         </div>
         <div className="flex items-center gap-3">
           <AnimatePresence mode="wait">
-            <motion.span key={saved ? 'saved' : 'saving'}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="text-[12px] text-[var(--color-faint)]">
+            <motion.span key={saved ? 'saved' : 'saving'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }} className="text-[12px] text-[var(--color-faint)]">
               {saved ? 'Saved' : 'Saving…'}
             </motion.span>
           </AnimatePresence>
@@ -123,15 +163,12 @@ export function EditorScreen() {
         </div>
       </div>
 
-      {/* three panes */}
-      <div className="grid grid-cols-[190px_1fr_276px] flex-1 min-h-0">
-        {/* outline */}
+      <div className="grid grid-cols-[210px_1fr_276px] flex-1 min-h-0">
+        {/* left: outline + reference pool */}
         <aside className="border-r border-[var(--color-border)] px-4 py-5 overflow-y-auto">
           <div className={paneLabel}>Outline</div>
           <div className="flex flex-col gap-0.5">
-            {sections.length === 0 && (
-              <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>
-            )}
+            {sections.length === 0 && <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>}
             {sections.map((s) => (
               <button key={s.id} onClick={() => goToBlock(s.id)}
                 className="text-left px-2.5 py-1.5 rounded-[var(--radius)] text-[13px] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-colors border-none bg-transparent truncate">
@@ -139,29 +176,64 @@ export function EditorScreen() {
               </button>
             ))}
           </div>
+          <ReferencePanel onCite={cite} />
         </aside>
 
-        {/* writing surface */}
+        {/* center: writing surface with reorder + insert */}
         <section className="overflow-y-auto px-10 py-8 bg-[var(--color-bg)]">
           <div className="max-w-[640px] mx-auto">
-            {blocks.map((b) => (
-              <BlockView key={b.id} block={b}
-                onChange={(patch) => patchBlock(b.id, patch)}
-                onDelete={() => deleteBlock(b.id)} />
+            {blocks.map((b, i) => (
+              <div key={b.id}
+                onDragOver={(e) => { if (dragId) e.preventDefault(); }}
+                onDrop={() => onDrop(b.id)}
+                className={dragId && dragId !== b.id ? 'border-t-2 border-transparent hover:border-[var(--color-accent)]' : ''}>
+                {/* insert-between affordance */}
+                <InsertBar onInsert={(t) => insertBlock(t, i)} />
+                <div className="flex items-start gap-1 group/row">
+                  <button
+                    draggable onDragStart={() => setDragId(b.id)} onDragEnd={() => setDragId(null)}
+                    aria-label="Drag to reorder"
+                    className="mt-1.5 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-[var(--color-faint)] border-none bg-transparent p-0 shrink-0">
+                    <GripVertical size={14} />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <BlockView block={b}
+                      onChange={(patch) => patchBlock(b.id, patch)}
+                      onDelete={() => deleteBlock(b.id)}
+                      onFocusCursor={(blockId, get) => { cursor.current = { blockId, get }; }} />
+                    {/* citation preview for paragraphs */}
+                    {b.type === 'paragraph' && /\[\[cite:/.test(b.content) && (
+                      <div className="text-[11px] text-[var(--color-faint)] mt-0.5 italic">
+                        Cited as: {renderCitations(b.content, markers).match(/\[[^\]]+\]|\([^)]+\)/g)?.join(' ') ?? ''}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             ))}
-            <div className="flex gap-2 mt-6 flex-wrap">
-              {([['section', '+ Section'], ['paragraph', '+ Text'], ['equation', '+ Equation'],
-                 ['figure', '+ Figure'], ['table', '+ Table']] as const).map(([type, label]) => (
-                <button key={type} onClick={() => addBlock(type)}
-                  className="text-[12px] text-[var(--color-muted)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-3 py-1.5 bg-[var(--color-surface)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] transition-colors">
-                  {label}
-                </button>
-              ))}
-            </div>
+
+            <InsertBar onInsert={(t) => insertBlock(t)} always />
+
+            {/* auto-generated reference section */}
+            {refList.length > 0 && (
+              <div className="mt-8 pt-4 border-t border-[var(--color-border)]">
+                <h2 className="tx-document text-[19px] font-semibold mb-3">References</h2>
+                <div className="flex flex-col gap-2">
+                  {refList.map((r, i) => (
+                    <div key={r.id} className="tx-document text-[13px] text-[var(--color-text)] leading-snug">
+                      {formatEntry(r, i, tpl)}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] text-[var(--color-faint)] mt-2">
+                  Auto-generated from citations · {tpl?.citationOrder === 'alphabetical' ? 'alphabetical' : 'order of appearance'}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* readiness */}
+        {/* right: readiness */}
         <aside className="border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface)] overflow-y-auto">
           <div className={paneLabel}>Readiness</div>
           <div className="flex flex-col items-center gap-3">
@@ -177,11 +249,7 @@ export function EditorScreen() {
           <Button variant="primary" className="w-full mt-4" onClick={checkCompliance} disabled={!tpl}>
             {score === null ? 'Check compliance' : 'Re-check'}
           </Button>
-          {!tpl && (
-            <div className="text-[12px] text-[var(--color-faint)] mt-2">
-              Choose a template on the dashboard to enable checks.
-            </div>
-          )}
+          {!tpl && <div className="text-[12px] text-[var(--color-faint)] mt-2">Choose a template on the dashboard to enable checks.</div>}
 
           <AnimatePresence>
             {report && (
@@ -191,12 +259,10 @@ export function EditorScreen() {
                     ? <><CircleCheck size={14} className="text-[var(--status-ready)]" /> No issues — ready to submit</>
                     : `${report.issues.length} issue${report.issues.length === 1 ? '' : 's'}`}
                 </div>
-                <motion.div className="flex flex-col gap-2"
-                  initial="hidden" animate="show"
+                <motion.div className="flex flex-col gap-2" initial="hidden" animate="show"
                   variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}>
                   {report.issues.map((issue) => (
-                    <motion.div key={issue.id}
-                      variants={{ hidden: { opacity: 0, x: 8 }, show: { opacity: 1, x: 0 } }}
+                    <motion.div key={issue.id} variants={{ hidden: { opacity: 0, x: 8 }, show: { opacity: 1, x: 0 } }}
                       transition={{ duration: 0.2 }}
                       className="border border-[var(--color-border)] rounded-[var(--radius)] p-2.5 flex gap-2 items-start justify-between bg-[var(--color-bg)]">
                       <div className="flex gap-2 items-start min-w-0">
@@ -218,6 +284,31 @@ export function EditorScreen() {
           </AnimatePresence>
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** A slim insert affordance between blocks: hover reveals block-type buttons. */
+function InsertBar({ onInsert, always = false }: {
+  onInsert: (t: DocumentBlock['type']) => void; always?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`${always ? 'mt-4' : 'h-2'} relative flex items-center justify-center group/ins`}
+      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      {(open || always) ? (
+        <div className="flex gap-1.5 flex-wrap py-1">
+          {([['section', '+ Section'], ['paragraph', '+ Text'], ['equation', '+ Equation'],
+             ['figure', '+ Figure'], ['table', '+ Table']] as const).map(([type, label]) => (
+            <button key={type} onClick={() => onInsert(type)}
+              className="text-[11px] text-[var(--color-muted)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-2.5 py-1 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="w-full h-px group-hover/ins:bg-[var(--color-border)]" />
+      )}
     </div>
   );
 }

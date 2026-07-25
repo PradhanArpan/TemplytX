@@ -3,7 +3,7 @@
  * Each block renders as an editable element in the author's serif.
  * Equations render live with KaTeX (click to edit, blur to render).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type {
@@ -21,21 +21,6 @@ const bare: React.CSSProperties = {
   width: '100%', border: 'none', outline: 'none', background: 'transparent',
   color: 'var(--color-text)', padding: 0, resize: 'none',
 };
-
-function GrowingTextarea({ value, onChange, placeholder }: {
-  value: string; onChange: (v: string) => void; placeholder?: string;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
-  }, [value]);
-  return (
-    <textarea ref={ref} value={value} placeholder={placeholder} rows={1}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 16, lineHeight: 1.7, overflow: 'hidden' }} />
-  );
-}
 
 function BlockShell({ children, onDelete, blockId }: {
   children: React.ReactNode; onDelete: () => void; blockId: string;
@@ -66,11 +51,21 @@ export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlo
   );
 }
 
-export function ParagraphView({ block, onChange, onDelete }: BlockProps<ParagraphBlock>) {
+export function ParagraphView({ block, onChange, onDelete, onFocusCursor }: BlockProps<ParagraphBlock> & {
+  onFocusCursor?: (blockId: string, getCursor: () => number) => void;
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
-      <GrowingTextarea value={block.content} placeholder="Write…"
-        onChange={(content) => onChange({ content } as Partial<ParagraphBlock>)} />
+      <textarea ref={taRef} value={block.content} placeholder="Write… (cite from the References panel)"
+        rows={1}
+        onFocus={() => onFocusCursor?.(block.id, () => taRef.current?.selectionStart ?? block.content.length)}
+        onChange={(e) => {
+          onChange({ content: e.target.value } as Partial<ParagraphBlock>);
+          const el = e.target; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`;
+        }}
+        onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }}
+        style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 16, lineHeight: 1.7, overflow: 'hidden' }} />
     </BlockShell>
   );
 }
@@ -158,10 +153,12 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
   );
 }
 
-export function BlockView({ block, onChange, onDelete }: BlockProps<DocumentBlock>) {
+export function BlockView({ block, onChange, onDelete, onFocusCursor }: BlockProps<DocumentBlock> & {
+  onFocusCursor?: (blockId: string, getCursor: () => number) => void;
+}) {
   switch (block.type) {
     case 'section': return <SectionView block={block} onChange={onChange} onDelete={onDelete} />;
-    case 'paragraph': return <ParagraphView block={block} onChange={onChange} onDelete={onDelete} />;
+    case 'paragraph': return <ParagraphView block={block} onChange={onChange} onDelete={onDelete} onFocusCursor={onFocusCursor} />;
     case 'equation': return <EquationView block={block} onChange={onChange} onDelete={onDelete} />;
     case 'figure': return <FigureView block={block} onChange={onChange} onDelete={onDelete} />;
     case 'table': return <TableView block={block} onChange={onChange} onDelete={onDelete} />;

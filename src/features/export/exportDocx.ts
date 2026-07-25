@@ -11,6 +11,8 @@ import { saveAs } from 'file-saver';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { computeNumbering } from './numbering';
+import { markerMap, renderCitations, orderedReferences, formatEntry } from '../references/format';
+import { listReferencesSync } from '../../services/references';
 
 const lineMap = { single: 240, onehalf: 360, double: 480 };
 
@@ -18,6 +20,9 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
   const fmt = tpl.formatting;
   const num = computeNumbering(doc.blocks, fmt.numberSections);
   const half = fmt.bodyFontPt * 2; // docx uses half-points
+  const pool = listReferencesSync();
+  const markers = markerMap(doc.blocks, pool, tpl);
+  const refList = orderedReferences(doc.blocks, pool, tpl);
 
   const children: (Paragraph | Table)[] = [
     new Paragraph({
@@ -43,7 +48,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
     } else if (b.type === 'paragraph') {
       children.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        children: [new TextRun({ text: b.content, size: half })],
+        children: [new TextRun({ text: renderCitations(b.content, markers), size: half })],
         spacing: { after: 120, line: lineMap[fmt.lineSpacing] },
       }));
     } else if (b.type === 'equation') {
@@ -85,6 +90,20 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
         })),
       }));
     }
+  }
+
+  if (refList.length > 0) {
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: 'References', bold: true, size: half + 2 })],
+      spacing: { before: 240, after: 80 },
+    }));
+    refList.forEach((r, i) => {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: formatEntry(r, i, tpl), size: half - 2 })],
+        spacing: { after: 80 },
+      }));
+    });
   }
 
   const document = new Document({

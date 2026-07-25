@@ -48,6 +48,9 @@ export interface Template {
   type: TemplateType;
   scope: TemplateScope;
   citationStyle: CitationStyle;
+  /** How the reference list is ordered: 'sequence' = order of first citation
+   *  (IEEE), 'alphabetical' = by first author surname (APA). */
+  citationOrder: 'sequence' | 'alphabetical';
   /** Ordered required/optional sections from the author instructions. */
   sections: SectionSpec[];
   /** Manuscript formatting rules for export. */

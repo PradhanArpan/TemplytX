@@ -23,6 +23,7 @@ export const templateCatalog: Template[] = [
   {
     id: 'tpl-ieee', name: 'IEEE Conference', publisher: 'IEEE', type: 'journal',
     scope: 'admin-global', citationStyle: 'ieee',
+    citationOrder: 'sequence',
     sections: [
       S('Abstract', true, '≤ 250 words, no citations'),
       S('Introduction'), S('Related Work', false), S('Methods'),
@@ -35,6 +36,7 @@ export const templateCatalog: Template[] = [
   {
     id: 'tpl-springer', name: 'Springer Nature', publisher: 'Springer', type: 'journal',
     scope: 'admin-global', citationStyle: 'springer',
+    citationOrder: 'alphabetical',
     sections: [
       S('Abstract', true, '≤ 250 words'), S('Introduction'), S('Methods'),
       S('Results'), S('Discussion'), S('Conclusion'),
@@ -47,6 +49,7 @@ export const templateCatalog: Template[] = [
   {
     id: 'tpl-elsevier', name: 'Elsevier', publisher: 'Elsevier', type: 'journal',
     scope: 'admin-global', citationStyle: 'elsevier',
+    citationOrder: 'alphabetical',
     sections: [
       S('Abstract', true, '≤ 300 words'), S('Introduction'),
       S('Material and Methods'), S('Results'), S('Discussion'),
@@ -63,6 +66,7 @@ export const templateCatalog: Template[] = [
   {
     id: 'tpl-thesis', name: 'PhD Thesis (Generic)', publisher: 'University', type: 'thesis',
     scope: 'admin-global', citationStyle: 'apa-7',
+    citationOrder: 'alphabetical',
     sections: [
       S('Title Page'), S('Abstract'), S('Acknowledgements', false),
       S('Table of Contents'), S('Introduction'), S('Literature Review'),
@@ -79,6 +83,7 @@ export const templateCatalog: Template[] = [
   {
     id: 'tpl-report', name: 'Technical Report', publisher: 'Generic', type: 'report',
     scope: 'admin-global', citationStyle: 'apa-7',
+    citationOrder: 'alphabetical',
     sections: [
       S('Executive Summary'), S('Introduction'), S('Background', false),
       S('Methodology'), S('Findings'), S('Recommendations'),
@@ -94,6 +99,7 @@ export const templateCatalog: Template[] = [
   {
     id: 'tpl-proposal', name: 'Grant / Research Proposal', publisher: 'Generic', type: 'proposal',
     scope: 'admin-global', citationStyle: 'apa-7',
+    citationOrder: 'alphabetical',
     sections: [
       S('Project Summary'), S('Objectives'), S('Background and Rationale'),
       S('Methodology'), S('Expected Outcomes'), S('Timeline'),

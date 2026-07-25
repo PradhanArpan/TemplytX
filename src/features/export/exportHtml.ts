@@ -8,6 +8,8 @@ import katex from 'katex';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { computeNumbering } from './numbering';
+import { markerMap, renderCitations, orderedReferences, formatEntry } from '../references/format';
+import { listReferencesSync } from '../../services/references';
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -18,6 +20,9 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   const fmt = tpl.formatting;
   const num = computeNumbering(doc.blocks, fmt.numberSections);
   const margin = fmt.paperSize === 'a4' ? '2.5cm' : '1in';
+  const pool = listReferencesSync();
+  const markers = markerMap(doc.blocks, pool, tpl);
+  const refList = orderedReferences(doc.blocks, pool, tpl);
 
   let secN = 0;
   const body = doc.blocks.map((b) => {
@@ -27,7 +32,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         return `<h2 class="sec">${n}${esc(b.title)}</h2>`;
       }
       case 'paragraph':
-        return `<p>${esc(b.content)}</p>`;
+        return `<p>${esc(renderCitations(b.content, markers))}</p>`;
       case 'equation': {
         const n = num.equations.get(b.id);
         let math = '';
@@ -52,6 +57,11 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
     }
   }).join('\n');
 
+  const refsHtml = refList.length > 0
+    ? `<h2 class="sec">References</h2>` +
+      refList.map((r, i) => `<p class="ref">${esc(formatEntry(r, i, tpl))}</p>`).join('\n')
+    : '';
+
   return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(doc.title)}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -65,6 +75,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   .meta { text-align: center; color: #333; margin-bottom: 16pt; column-span: all; font-size: ${fmt.bodyFontPt - 1}pt; }
   h2.sec { font-size: ${fmt.bodyFontPt + 1}pt; margin: 12pt 0 4pt; }
   p { margin: 0 0 6pt; text-align: justify; }
+  p.ref { padding-left: 1.5em; text-indent: -1.5em; text-align: left; }
   .eq { display: flex; align-items: center; justify-content: center; gap: 12pt; margin: 8pt 0; }
   .eq-num { color: #333; }
   figure.fig { margin: 10pt 0; text-align: center; break-inside: avoid; }
@@ -93,6 +104,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   <h1 class="title">${esc(doc.title)}</h1>
   <div class="meta">Prepared with TemplytX · ${esc(tpl.publisher)} ${esc(tpl.type)} template</div>
   ${body}
+  ${refsHtml}
 </div></div>
 </body></html>`;
 }

@@ -15,11 +15,18 @@ export type BlockType =
   | 'table'
   | 'citation';
 
-/** A citation reference stored as CSL-JSON (Citation Style Language). */
+/** A citation reference. CSL-JSON-shaped structured fields for formatting,
+ *  plus the raw cslJson for BibTeX/export. Lives in the account-level pool. */
 export interface Reference {
   id: string;
-  cslJson: Record<string, unknown>; // normalized CSL-JSON
-  position: number;
+  title: string;
+  authors: string[];      // ["Leopold, L. B.", "Langbein, W. B."]
+  year: number | null;
+  container?: string;     // journal / conference / publisher
+  doi?: string;
+  url?: string;
+  /** Full CSL-JSON for round-tripping and BibTeX generation. */
+  cslJson: Record<string, unknown>;
 }
 
 interface BaseBlock {
