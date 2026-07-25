@@ -9,6 +9,8 @@ const EditorScreen = lazy(() =>
   import('../features/editor/EditorScreen').then((m) => ({ default: m.EditorScreen })));
 const ExportScreen = lazy(() =>
   import('../features/export/ExportScreen').then((m) => ({ default: m.ExportScreen })));
+const UploadTemplate = lazy(() =>
+  import('../features/templates/UploadTemplate').then((m) => ({ default: m.UploadTemplate })));
 
 const Loading = () => (
   <div style={{ padding: 'var(--space-10)', color: 'var(--color-muted)' }}>Loading…</div>
@@ -22,6 +24,7 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <DashboardScreen /> },
+      { path: 'templates/upload', element: <Suspense fallback={<Loading />}><UploadTemplate /></Suspense> },
       { path: 'doc/:id', element: <Suspense fallback={<Loading />}><EditorScreen /></Suspense> },
       { path: 'doc/:id/export', element: <Suspense fallback={<Loading />}><ExportScreen /></Suspense> },
     ],

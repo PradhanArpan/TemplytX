@@ -62,6 +62,12 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
       refList.map((r, i) => `<p class="ref">${esc(formatEntry(r, i, tpl))}</p>`).join('\n')
     : '';
 
+  const authorBlock = doc.authors.length > 0
+    ? `<div class="authors">${doc.authors.map((a) =>
+        `<span class="author">${esc(a.name)}${a.isCorresponding ? '<sup>*</sup>' : ''}${a.affiliation ? `<br><span class="affil">${esc(a.affiliation)}</span>` : ''}</span>`
+      ).join('')}</div>${doc.authors.some((a) => a.isCorresponding) ? '<div class="corr">* Corresponding author</div>' : ''}`
+    : '';
+
   return `<!doctype html><html><head><meta charset="utf-8"/>
 <title>${esc(doc.title)}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -71,7 +77,11 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
     font-size: ${fmt.bodyFontPt}pt; line-height: ${spacingMap[fmt.lineSpacing]};
     color: #000; margin: 0; }
   .wrap { ${fmt.columns === 2 ? 'column-count: 2; column-gap: 0.5cm;' : ''} }
-  h1.title { font-size: ${fmt.bodyFontPt + 6}pt; text-align: center; margin: 0 0 4pt; column-span: all; }
+  h1.title { font-size: ${fmt.bodyFontPt + 6}pt; text-align: center; margin: 0 0 8pt; column-span: all; }
+  .authors { text-align: center; column-span: all; margin-bottom: 6pt; }
+  .author { display: inline-block; margin: 0 12pt; font-size: ${fmt.bodyFontPt}pt; }
+  .affil { font-size: ${fmt.bodyFontPt - 2}pt; color: #333; font-style: italic; }
+  .corr { text-align: center; column-span: all; font-size: ${fmt.bodyFontPt - 2}pt; color: #333; margin-bottom: 12pt; }
   .meta { text-align: center; color: #333; margin-bottom: 16pt; column-span: all; font-size: ${fmt.bodyFontPt - 1}pt; }
   h2.sec { font-size: ${fmt.bodyFontPt + 1}pt; margin: 12pt 0 4pt; }
   p { margin: 0 0 6pt; text-align: justify; }
@@ -102,6 +112,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
 </div>
 <div class="doc"><div class="wrap">
   <h1 class="title">${esc(doc.title)}</h1>
+  ${authorBlock}
   <div class="meta">Prepared with TemplytX · ${esc(tpl.publisher)} ${esc(tpl.type)} template</div>
   ${body}
   ${refsHtml}

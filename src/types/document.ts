@@ -75,10 +75,23 @@ export type DocumentBlock =
 
 export type DocumentStatus = 'draft' | 'checked' | 'ready';
 
+/** An author in the document front-matter. */
+export interface Author {
+  id: string;
+  name: string;
+  affiliation: string;
+  isCorresponding: boolean;
+}
+
 export interface TemplytXDocument {
   id: string;
   ownerId: string;
   title: string;
+  /** Structured front-matter, separate from body. Included or anonymized at
+   *  export time per the journal's requirement. */
+  authors: Author[];
+  /** Optional target. A neutral "Article" has none until the user picks one
+   *  (at check or export time). Format is decoupled from content. */
   targetTemplateId: string | null;
   status: DocumentStatus;
   /** Null = never checked. Stale flag lives in editor state, not persisted. */

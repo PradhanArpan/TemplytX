@@ -1,39 +1,45 @@
-TemplytX — Reorder + Citation system
-====================================
-Copy these files over your templytx/ folder, preserving paths.
-No NEW libraries this phase, but to be safe run npm install anyway, then push:
+TemplytX — Citations + Front-matter + Format-at-export + Template upload
+=======================================================================
+This ONE bundle contains TWO phases (the citation system you hadn't pushed
+yet, PLUS the new front-matter/format/upload work). Copy all files over your
+templytx/ folder, preserving paths. No new libraries — but run install anyway:
 
   npm install
   git add .
-  git commit -m "Add block reorder + citation system"
+  git commit -m "Citations, front-matter, format-at-export, template upload"
   git push origin main
 
-WHAT'S NEW
-1. MOVE / INSERT anything:
-   - Hover any block -> a grip handle (left) appears -> drag to reorder.
-   - Hover BETWEEN blocks -> insert buttons appear -> add a section/text/
-     figure/etc exactly there (fixes "can't add a missed section").
+============================ WHAT'S NEW ============================
 
-2. CITATION SYSTEM (left panel, below Outline -> "References"):
-   - Add references three ways: DOI (auto-fetches title/authors/year via
-     Crossref), BibTeX paste, or manual form. They join your library pool.
-   - While writing: click a reference in the panel to CITE it at your cursor
-     in the focused paragraph. A small "Cited as:" preview shows the marker.
-   - The References section at the bottom of the document GENERATES ITSELF
-     from what you cited, ordered per template:
-       * IEEE  -> numbered [1],[2]... in order of appearance
-       * APA/Springer/Elsevier -> alphabetical by author
-   - Citations + reference list flow into BOTH PDF and Word export.
+FROM THE CITATION PHASE (not previously pushed):
+- Drag any block to reorder (grip handle on hover); insert blocks BETWEEN
+  others (hover the gap) — fixes "can't add a missed section".
+- Reference library in the left panel: add by DOI (auto-fetch via Crossref),
+  BibTeX paste, or manual form. Click a reference to cite at your cursor.
+  The References section GENERATES ITSELF, ordered per template (IEEE numeric
+  by appearance; APA/Springer/Elsevier alphabetical). Flows into PDF + Word.
+  NOTE: reference library is session-only until the backend (your choice).
+  NOTE: Google Scholar links can't auto-fetch (no API) — use DOI or BibTeX.
 
-IMPORTANT LIMITS (honest):
-- The reference library is SESSION-ONLY for now — it resets on a hard page
-  refresh. It becomes permanent + synced to your account in the backend
-  phase. (This was your explicit choice.)
-- DOI fetch needs internet and a valid DOI. Google Scholar links do NOT
-  work (Scholar has no API / blocks fetching) — use the DOI or BibTeX from
-  Scholar's "Cite" button instead.
+NEW THIS PHASE:
+- FRONT-MATTER: title + authors at the top of the editor. Add authors via
+  "+", each with affiliation; click the star to set the corresponding author.
+- WRITE ONCE, EXPORT TO ANY FORMAT: content is now decoupled from journal.
+  On the Export screen there's a "Target format" picker — export the same
+  article as Elsevier, then re-export as Springer with no rewrite. Compliance
+  on the export screen checks against whichever target you pick.
+- AUTHOR BLOCK TOGGLE on export: "Include authors" (final submission) vs
+  "Anonymize" (double-blind review). Authors appear in PDF + Word when included.
+- UPLOAD TEMPLATE: dashboard -> "Upload template". Upload a LaTeX .zip or
+  .docx; it's stored and named so you can write against it.
+  HONEST LIMIT: this stores the template + lets you write against structure.
+  Reproducing your institute's EXACT LaTeX-typeset PDF (like Overleaf) needs
+  a LaTeX-compilation backend — that's the next big infrastructure phase,
+  clearly flagged in the upload screen.
 
 TRY IT
-Open a doc -> in References panel click + -> DOI -> paste 10.3133/pp422H ->
-Add. Click into a paragraph, place cursor, click the reference to cite it.
-Scroll down: the References section appears automatically. Export to PDF.
+- Open a doc: add a couple of authors up top, star one as corresponding.
+- Go to Export: switch "Target format" between Elsevier and Springer and
+  watch the compliance score change; toggle Include/Anonymize; Generate.
+- Dashboard -> Upload template -> drop any .zip, name it, save; it appears
+  in the New Document dropdown.

@@ -29,12 +29,32 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
       alignment: AlignmentType.CENTER,
       children: [new TextRun({ text: doc.title, bold: true, size: half + 12 })],
     }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: `${tpl.publisher} ${tpl.type} template`, italics: true, size: half - 2, color: '555555' })],
-      spacing: { after: 240 },
-    }),
   ];
+
+  if (doc.authors.length > 0) {
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: doc.authors.flatMap((a, i) => [
+        new TextRun({ text: `${a.name}${a.isCorresponding ? '*' : ''}`, size: half }),
+        ...(a.affiliation ? [new TextRun({ text: ` (${a.affiliation})`, italics: true, size: half - 2 })] : []),
+        ...(i < doc.authors.length - 1 ? [new TextRun({ text: ',  ', size: half })] : []),
+      ]),
+      spacing: { after: 60 },
+    }));
+    if (doc.authors.some((a) => a.isCorresponding)) {
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: '* Corresponding author', size: half - 2, color: '555555' })],
+        spacing: { after: 120 },
+      }));
+    }
+  }
+
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    children: [new TextRun({ text: `${tpl.publisher} ${tpl.type} template`, italics: true, size: half - 2, color: '555555' })],
+    spacing: { after: 240 },
+  }));
 
   let secN = 0;
   for (const b of doc.blocks) {

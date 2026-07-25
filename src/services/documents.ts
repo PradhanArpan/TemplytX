@@ -22,7 +22,7 @@ export async function createDocument(
   input: Pick<TemplytXDocument, 'title' | 'targetTemplateId'>,
 ): Promise<TemplytXDocument> {
   const doc: TemplytXDocument = {
-    id: `doc-${crypto.randomUUID()}`, ownerId: 'me',
+    id: `doc-${crypto.randomUUID()}`, ownerId: 'me', authors: [],
     title: input.title || 'Untitled', targetTemplateId: input.targetTemplateId,
     status: 'draft', readinessScore: null, blocks: [], references: [],
     createdAt: now(), updatedAt: now(),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, Plus } from 'lucide-react';
+import { FileText, Plus, Upload } from 'lucide-react';
 import { listDocuments, createDocument, listTemplates } from '../../services/documents';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
@@ -64,9 +64,14 @@ export function DashboardScreen() {
             {docs === null ? '…' : `${docs.length} document${docs.length === 1 ? '' : 's'}`}
           </p>
         </div>
-        <Button variant={creating ? 'secondary' : 'primary'} onClick={() => setCreating((v) => !v)}>
-          {creating ? 'Cancel' : <><Plus size={15} /> New document</>}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => navigate('/templates/upload')}>
+            <Upload size={15} /> Upload template
+          </Button>
+          <Button variant={creating ? 'secondary' : 'primary'} onClick={() => setCreating((v) => !v)}>
+            {creating ? 'Cancel' : <><Plus size={15} /> New document</>}
+          </Button>
+        </div>
       </div>
 
       {creating && (

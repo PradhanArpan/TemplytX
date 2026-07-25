@@ -21,6 +21,20 @@ const journalRules: RuleConfig[] = [
 
 export const templateCatalog: Template[] = [
   {
+    id: 'tpl-article', name: 'Article (neutral)', publisher: 'TemplytX', type: 'journal',
+    scope: 'admin-global', citationStyle: 'apa-7', citationOrder: 'sequence',
+    sections: [
+      S('Abstract'), S('Introduction'), S('Methods'),
+      S('Results'), S('Discussion'), S('Conclusion'), S('References'),
+    ],
+    formatting: { paperSize: 'a4', columns: 1, lineSpacing: 'onehalf', bodyFont: 'Times New Roman', bodyFontPt: 12, numberSections: true },
+    rules: [
+      { ruleId: 'required-sections', severity: 'warning' },
+      { ruleId: 'figure-cited-in-text', severity: 'warning' },
+    ],
+    isActive: true,
+  },
+  {
     id: 'tpl-ieee', name: 'IEEE Conference', publisher: 'IEEE', type: 'journal',
     scope: 'admin-global', citationStyle: 'ieee',
     citationOrder: 'sequence',

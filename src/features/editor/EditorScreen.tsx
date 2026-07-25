@@ -13,6 +13,8 @@ import { Button, Badge } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Card';
 import { ReadinessGauge } from '../../components/ui/ReadinessGauge';
 import { BlockView } from './blocks/BlockView';
+import { FrontMatter } from './FrontMatter';
+import type { Author } from '../../types/document';
 
 const paneLabel =
   'text-[12px] tracking-[0.06em] uppercase text-[var(--color-faint)] font-semibold mb-3';
@@ -35,6 +37,8 @@ export function EditorScreen() {
   const [doc, setDoc] = useState<TemplytXDocument | null>(null);
   const [tpl, setTpl] = useState<Template | null>(null);
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
+  const [authors, setAuthors] = useState<Author[]>([]);
+  const [docTitle, setDocTitle] = useState('');
   const [pool, setPool] = useState<Reference[]>([]);
   const [report, setReport] = useState<ComplianceReport | null>(null);
   const [stale, setStale] = useState(false);
@@ -49,6 +53,8 @@ export function EditorScreen() {
     getDocument(id).then((d) => {
       setDoc(d);
       setBlocks(d?.blocks ?? []);
+      setAuthors(d?.authors ?? []);
+      setDocTitle(d?.title ?? '');
       if (d?.targetTemplateId) listTemplates().then((ts) =>
         setTpl(ts.find((t) => t.id === d.targetTemplateId) ?? null));
     });
@@ -70,6 +76,21 @@ export function EditorScreen() {
     applyBlocks(blocks.map((b) => (b.id === blockId ? { ...b, ...patch } as DocumentBlock : b)));
   }
   function deleteBlock(blockId: string) { applyBlocks(blocks.filter((b) => b.id !== blockId)); }
+
+  function saveTitle(t: string) {
+    setDocTitle(t); setSaved(false);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      if (id) await updateDocument(id, { title: t }); setSaved(true);
+    }, 800);
+  }
+  function saveAuthors(a: Author[]) {
+    setAuthors(a); setSaved(false);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      if (id) await updateDocument(id, { authors: a }); setSaved(true);
+    }, 800);
+  }
 
   /** Insert a new block at a given index (default: end). */
   function insertBlock(type: DocumentBlock['type'], at?: number) {
@@ -149,7 +170,7 @@ export function EditorScreen() {
             className="p-1.5 rounded-[var(--radius)] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors border-none bg-transparent">
             <ArrowLeft size={17} />
           </button>
-          <span className="tx-document text-[18px] font-medium truncate">{doc.title}</span>
+          <span className="tx-document text-[18px] font-medium truncate">{docTitle || "Untitled"}</span>
           {tpl && <Badge tone="accent">{tpl.name}</Badge>}
         </div>
         <div className="flex items-center gap-3">
@@ -182,6 +203,8 @@ export function EditorScreen() {
         {/* center: writing surface with reorder + insert */}
         <section className="overflow-y-auto px-10 py-8 bg-[var(--color-bg)]">
           <div className="max-w-[640px] mx-auto">
+            <FrontMatter title={docTitle} authors={authors}
+              onTitle={saveTitle} onAuthors={saveAuthors} />
             {blocks.map((b, i) => (
               <div key={b.id}
                 onDragOver={(e) => { if (dragId) e.preventDefault(); }}

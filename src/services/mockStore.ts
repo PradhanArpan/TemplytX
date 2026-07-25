@@ -24,7 +24,7 @@ const doc2Blocks: DocumentBlock[] = [
 ];
 
 export const mockDocuments: TemplytXDocument[] = [
-  { id: 'doc-1', ownerId: 'me',
+  { id: 'doc-1', ownerId: 'me', authors: [],
     title: 'Thermal analysis of additively manufactured heat sinks',
     targetTemplateId: 'tpl-ieee', status: 'ready', readinessScore: 100,
     blocks: [
@@ -32,11 +32,11 @@ export const mockDocuments: TemplytXDocument[] = [
       { id: 'a-2', type: 'paragraph',
         content: 'We present a thermal model of additively manufactured heat sinks, evaluating conduction pathways across three lattice geometries under steady-state load.' } ],
     references: [], createdAt: now(), updatedAt: now() },
-  { id: 'doc-2', ownerId: 'me',
+  { id: 'doc-2', ownerId: 'me', authors: [],
     title: 'CFD study of urban canyon ventilation',
     targetTemplateId: 'tpl-elsevier', status: 'draft', readinessScore: null,
     blocks: doc2Blocks, references: [], createdAt: now(), updatedAt: now() },
-  { id: 'doc-3', ownerId: 'me',
+  { id: 'doc-3', ownerId: 'me', authors: [],
     title: 'PhD Chapter 3 — Numerical methods',
     targetTemplateId: 'tpl-thesis', status: 'draft', readinessScore: null,
     blocks: [], references: [], createdAt: now(), updatedAt: now() },
