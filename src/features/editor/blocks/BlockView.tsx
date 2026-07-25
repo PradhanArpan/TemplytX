@@ -3,7 +3,7 @@
  * Each block renders as an editable element in the author's serif.
  * Equations render live with KaTeX (click to edit, blur to render).
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import type {
@@ -55,6 +55,11 @@ export function ParagraphView({ block, onChange, onDelete, onFocusCursor }: Bloc
   onFocusCursor?: (blockId: string, getCursor: () => number) => void;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
+  // Grow to fit content on mount and whenever content changes (e.g. on load).
+  useEffect(() => {
+    const el = taRef.current;
+    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
+  }, [block.content]);
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <textarea ref={taRef} value={block.content} placeholder="Write… (cite from the References panel)"

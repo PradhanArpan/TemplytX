@@ -15,6 +15,24 @@ export interface UploadedTemplate {
 
 const store: UploadedTemplate[] = [];
 
+/** Build a usable Template spec from an uploaded template, based on its type.
+ *  Until the file is parsed/compiled, it inherits a sensible default skeleton
+ *  for its kind so the user can write, check, and export against it today. */
+import type { Template } from '../types/compliance';
+import { templateCatalog } from './templates';
+
+export function uploadedToTemplate(u: UploadedTemplate): Template {
+  // Base the spec on the shipped template of the same type (closest structure).
+  const base = templateCatalog.find((t) => t.type === u.type) ?? templateCatalog[0];
+  return {
+    ...base,
+    id: `up-tpl-${u.id}`,
+    name: `${u.name} (uploaded)`,
+    publisher: 'Your library',
+    scope: 'user-private',
+  };
+}
+
 export async function addUploadedTemplate(
   input: Omit<UploadedTemplate, 'id' | 'createdAt'>,
 ): Promise<UploadedTemplate> {
@@ -25,4 +43,9 @@ export async function addUploadedTemplate(
 
 export async function listUploadedTemplates(): Promise<UploadedTemplate[]> {
   return [...store];
+}
+
+/** Uploaded templates as full Template specs, for the create dropdown etc. */
+export function listUploadedAsTemplates(): Template[] {
+  return store.map(uploadedToTemplate);
 }

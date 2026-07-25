@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, Plus, Upload } from 'lucide-react';
-import { listDocuments, createDocument, listTemplates } from '../../services/documents';
+import { FileText, Plus, Upload, Trash2 } from 'lucide-react';
+import { listDocuments, createDocument, listTemplates, deleteDocument } from '../../services/documents';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
@@ -130,7 +130,7 @@ export function DashboardScreen() {
                 variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
               >
-                <Card onClick={() => navigate(`/doc/${d.id}`)} className="p-5 flex items-center gap-4">
+                <Card onClick={() => navigate(`/doc/${d.id}`)} className="p-5 flex items-center gap-4 group">
                   <div className="flex-1 min-w-0">
                     <div className="tx-document text-[18px] font-medium text-[var(--color-text)] mb-2 truncate">
                       {d.title}
@@ -144,6 +144,17 @@ export function DashboardScreen() {
                     style={{ color: scoreColor(d) }}>
                     {d.readinessScore === null ? '—' : `${d.readinessScore}%`}
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete "${d.title}"? This cannot be undone.`)) {
+                        deleteDocument(d.id).then(() => listDocuments().then(setDocs));
+                      }
+                    }}
+                    aria-label="Delete document"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-[var(--radius)] text-[var(--color-faint)] hover:text-[var(--status-error)] hover:bg-[var(--status-error-bg)] cursor-pointer border-none bg-transparent shrink-0">
+                    <Trash2 size={16} />
+                  </button>
                 </Card>
               </motion.div>
             );

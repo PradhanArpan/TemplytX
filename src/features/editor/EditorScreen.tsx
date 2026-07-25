@@ -316,21 +316,43 @@ function InsertBar({ onInsert, always = false }: {
   onInsert: (t: DocumentBlock['type']) => void; always?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  return (
-    <div className={`${always ? 'mt-4' : 'h-2'} relative flex items-center justify-center group/ins`}
-      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      {(open || always) ? (
-        <div className="flex gap-1.5 flex-wrap py-1">
-          {([['section', '+ Section'], ['paragraph', '+ Text'], ['equation', '+ Equation'],
-             ['figure', '+ Figure'], ['table', '+ Table']] as const).map(([type, label]) => (
+  const items = [['paragraph', 'Text'], ['section', 'Section'], ['equation', 'Equation'],
+    ['figure', 'Figure'], ['table', 'Table']] as const;
+
+  if (always) {
+    // Persistent, prominent "add content" toolbar at the end of the document.
+    return (
+      <div className="mt-6 pt-4 border-t border-dashed border-[var(--color-border)]">
+        <div className="text-[11px] uppercase tracking-[0.06em] text-[var(--color-faint)] font-semibold mb-2">
+          Add content
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {items.map(([type, label]) => (
             <button key={type} onClick={() => onInsert(type)}
-              className="text-[11px] text-[var(--color-muted)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-2.5 py-1 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
-              {label}
+              className="flex items-center gap-1 text-[13px] text-[var(--color-text)] cursor-pointer border border-[var(--color-border-strong)] rounded-[var(--radius)] px-3 py-1.5 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
+              <span className="text-[var(--color-accent)] font-semibold">+</span> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Between-blocks inserter: a thin line that reveals buttons on hover.
+  return (
+    <div className="relative h-3 flex items-center justify-center group/ins"
+      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      {open ? (
+        <div className="flex gap-1.5 flex-wrap py-1 bg-[var(--color-bg)] z-10">
+          {items.map(([type, label]) => (
+            <button key={type} onClick={() => onInsert(type)}
+              className="text-[11px] text-[var(--color-muted)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-2.5 py-0.5 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
+              + {label}
             </button>
           ))}
         </div>
       ) : (
-        <div className="w-full h-px group-hover/ins:bg-[var(--color-border)]" />
+        <div className="w-full h-px group-hover/ins:bg-[var(--color-accent)] transition-colors" />
       )}
     </div>
   );

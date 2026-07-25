@@ -41,5 +41,10 @@ export async function updateDocument(
 }
 
 export async function listTemplates() {
-  return mockTemplates;
+  const { listUploadedAsTemplates } = await import('./uploadedTemplates');
+  return [...mockTemplates, ...listUploadedAsTemplates()];
+}
+export async function deleteDocument(id: string): Promise<void> {
+  const idx = mockDocuments.findIndex((d) => d.id === id);
+  if (idx !== -1) mockDocuments.splice(idx, 1);
 }
