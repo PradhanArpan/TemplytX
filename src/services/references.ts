@@ -7,6 +7,11 @@
 import type { Reference } from '../types/document';
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 
+export interface ReferenceFolder { id: string; name: string; }
+
+// In-memory caches (mirror of DB when logged in).
+let folders: ReferenceFolder[] = [];
+
 // In-memory cache (mirror of DB when logged in; the whole pool when not).
 let pool: Reference[] = [
   {
@@ -132,4 +137,30 @@ export function toBibtex(refs: Reference[]): string {
     ].filter(Boolean).join(',\n');
     return `@article{${key},\n${lines}\n}`;
   }).join('\n\n');
+}
+
+// --- folders -----------------------------------------------------------------
+export async function listFolders(): Promise<ReferenceFolder[]> {
+  const u = await uid();
+  if (!u || !supabase) return [...folders];
+  const { data, error } = await supabase
+    .from('reference_folders').select('id, name').order('created_at');
+  if (error) throw error;
+  folders = (data ?? []) as ReferenceFolder[];
+  return [...folders];
+}
+
+export async function createFolder(name: string): Promise<ReferenceFolder> {
+  const u = await uid();
+  if (!u || !supabase) {
+    const f = { id: `fold-${crypto.randomUUID()}`, name };
+    folders.push(f);
+    return f;
+  }
+  const { data, error } = await supabase
+    .from('reference_folders').insert({ owner_id: u, name }).select('id, name').single();
+  if (error) throw error;
+  const f = data as ReferenceFolder;
+  folders.push(f);
+  return f;
 }

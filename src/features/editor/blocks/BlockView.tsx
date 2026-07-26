@@ -31,11 +31,16 @@ function BlockShell({ children, onDelete, blockId }: {
     <div id={`block-${blockId}`} data-block-id={blockId}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: 'relative', padding: '2px 0', borderRadius: 4 }}>
-      {hover && (
-        <button onClick={onDelete} aria-label="Delete block"
-          style={{ position: 'absolute', right: -34, top: 2, border: 'none',
-            background: 'transparent', color: 'var(--color-faint)', cursor: 'pointer', fontSize: 14, padding: 4 }}>✕</button>
-      )}
+      <button onClick={onDelete} aria-label="Delete block" title="Delete this block"
+        style={{
+          position: 'absolute', right: 4, top: 4, zIndex: 5,
+          border: '1px solid var(--color-border)', borderRadius: 6,
+          background: 'var(--color-surface)',
+          color: hover ? 'var(--status-error)' : 'var(--color-faint)',
+          cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '3px 6px',
+          opacity: hover ? 1 : 0, transition: 'opacity 120ms',
+          boxShadow: 'var(--shadow-card)',
+        }}>✕</button>
       {children}
     </div>
   );

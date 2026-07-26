@@ -348,12 +348,12 @@ function InsertBar({ onInsert, always = false }: {
     );
   }
 
-  // Between-blocks inserter: a thin line that reveals buttons on hover.
+  // Between-blocks inserter: a hoverable gap that reveals a + and buttons.
   return (
-    <div className="relative h-3 flex items-center justify-center group/ins"
+    <div className="relative h-5 flex items-center justify-center group/ins"
       onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       {open ? (
-        <div className="flex gap-1.5 flex-wrap py-1 bg-[var(--color-bg)] z-10">
+        <div className="flex gap-1.5 flex-wrap py-1 px-2 bg-[var(--color-bg)] z-10 rounded">
           {items.map(([type, label]) => (
             <button key={type} onClick={() => onInsert(type)}
               className="text-[11px] text-[var(--color-muted)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-2.5 py-0.5 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
@@ -362,7 +362,11 @@ function InsertBar({ onInsert, always = false }: {
           ))}
         </div>
       ) : (
-        <div className="w-full h-px group-hover/ins:bg-[var(--color-accent)] transition-colors" />
+        <div className="w-full flex items-center justify-center">
+          <div className="flex-1 h-px group-hover/ins:bg-[var(--color-border)] transition-colors" />
+          <span className="opacity-0 group-hover/ins:opacity-100 transition-opacity text-[var(--color-faint)] text-[11px] px-2 shrink-0">+ insert</span>
+          <div className="flex-1 h-px group-hover/ins:bg-[var(--color-border)] transition-colors" />
+        </div>
       )}
     </div>
   );

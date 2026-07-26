@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, BookMarked, Loader2 } from 'lucide-react';
 import {
   listReferences, addReference, removeReference, fetchByDoi, parseBibtex,
+  listFolders, createFolder, type ReferenceFolder,
 } from '../../services/references';
 import type { Reference } from '../../types/document';
 
@@ -23,7 +24,17 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
   const [manual, setManual] = useState({ title: '', authors: '', year: '', container: '' });
 
   const refresh = () => listReferences().then(setRefs);
-  useEffect(() => { refresh(); }, []);
+  const [folders, setFolders] = useState<ReferenceFolder[]>([]);
+  const [newFolder, setNewFolder] = useState('');
+  const [addingFolder, setAddingFolder] = useState(false);
+  useEffect(() => { refresh(); listFolders().then(setFolders); }, []);
+
+  async function handleCreateFolder() {
+    if (!newFolder.trim()) return;
+    await createFolder(newFolder.trim());
+    setNewFolder(''); setAddingFolder(false);
+    listFolders().then(setFolders);
+  }
 
   async function submit() {
     setErr(''); setBusy(true);
@@ -64,6 +75,37 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
           className="p-1 rounded text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] cursor-pointer border-none bg-transparent">
           <Plus size={14} />
         </button>
+      </div>
+
+      {/* Folders — organize the account library. Visible across all documents. */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[11px] text-[var(--color-faint)] font-medium">Folders</span>
+          <button onClick={() => setAddingFolder((v) => !v)} aria-label="New folder"
+            className="text-[11px] text-[var(--color-accent)] cursor-pointer border-none bg-transparent p-0">
+            + folder
+          </button>
+        </div>
+        {addingFolder && (
+          <div className="flex gap-1 mb-2">
+            <input autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); }}
+              placeholder="Folder name"
+              className="flex-1 text-[12px] px-2 py-1 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] outline-none focus:border-[var(--color-accent)]" />
+            <button onClick={handleCreateFolder}
+              className="text-[11px] px-2 rounded-[var(--radius)] bg-[var(--color-accent)] text-white border-none cursor-pointer">Add</button>
+          </div>
+        )}
+        {folders.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {folders.map((f) => (
+              <span key={f.id}
+                className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--color-surface-2)] text-[var(--color-muted)]">
+                {f.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <AnimatePresence>

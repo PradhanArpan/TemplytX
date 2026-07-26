@@ -127,3 +127,12 @@ a { color: var(--color-accent); text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   *, .tx-skeleton { transition: none !important; animation: none !important; }
 }
+
+/* Normalize rich-text paragraph internals: consistent spacing whether the
+   browser wraps lines in <div>, <p>, or bare text nodes. Fixes uneven line
+   spacing between paragraphs. */
+.tx-rich > div, .tx-rich > p {
+  margin: 0;
+  line-height: 1.7;
+}
+.tx-rich { text-align: justify; }

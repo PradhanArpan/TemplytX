@@ -72,7 +72,7 @@ export function RichParagraph({ html, onChange, onFocusCursor, blockId }: {
         onInput={emit}
         onFocus={() => onFocusCursor?.(blockId)}
         data-placeholder="Write…"
-        className="tx-document outline-none min-h-[1.7em] leading-[1.7] text-[16px] text-[var(--color-text)] empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--color-faint)]"
+        className="tx-document tx-rich outline-none min-h-[1.7em] leading-[1.7] text-[16px] text-[var(--color-text)] empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--color-faint)]"
         style={{ fontFamily: 'var(--font-document)' }} />
     </div>
   );
