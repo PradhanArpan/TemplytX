@@ -5,7 +5,7 @@ import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical } from 'lu
 import { getDocument, updateDocument, listTemplates } from '../../services/documents';
 import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
-import { orderedReferences, markerMap, renderCitations, formatEntry } from '../references/format';
+import { orderedReferences, markerMap, formatEntry } from '../references/format';
 import { ReferencePanel } from '../references/ReferencePanel';
 import type { TemplytXDocument, DocumentBlock, Reference } from '../../types/document';
 import type { Template, ComplianceReport } from '../../types/compliance';
@@ -18,6 +18,16 @@ import type { Author } from '../../types/document';
 
 const paneLabel =
   'text-[12px] tracking-[0.06em] uppercase text-[var(--color-faint)] font-semibold mb-3';
+
+/** Convert chip spans in a DOM element back to [[cite:id]] tokens. */
+function tokensFromEl(node: HTMLElement): string {
+  const clone = node.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('span.tx-cite').forEach((el) => {
+    const id = el.getAttribute('data-cite');
+    el.replaceWith(document.createTextNode(`[[cite:${id}]]`));
+  });
+  return clone.innerHTML;
+}
 
 function newBlock(type: DocumentBlock['type'], title = ''): DocumentBlock {
   const id = `b-${crypto.randomUUID()}`;
@@ -73,6 +83,18 @@ export function EditorScreen() {
   }, [id]);
 
   function patchBlock(blockId: string, patch: Partial<DocumentBlock>) {
+    // Key-based citing: if the user typed \cite{key}, resolve it against the
+    // reference pool and convert to a [[cite:id]] token.
+    if (typeof (patch as { content?: string }).content === 'string') {
+      let content = (patch as { content: string }).content;
+      if (content.includes('\\cite{')) {
+        content = content.replace(/\\cite\{([^}]+)\}/g, (whole, key) => {
+          const ref = pool.find((r) => r.citeKey === key.trim());
+          return ref ? `[[cite:${ref.id}]]` : whole;
+        });
+        (patch as { content: string }).content = content;
+      }
+    }
     applyBlocks(blocks.map((b) => (b.id === blockId ? { ...b, ...patch } as DocumentBlock : b)));
   }
   function deleteBlock(blockId: string) { applyBlocks(blocks.filter((b) => b.id !== blockId)); }
@@ -119,20 +141,29 @@ export function EditorScreen() {
     if (!c) return; // no paragraph focused
     const target = blocks.find((b) => b.id === c.blockId);
     if (!target || target.type !== 'paragraph') return;
-    const token = `[[cite:${ref.id}]]`;
-    // Insert at the caret inside the focused contentEditable, if the selection
-    // is within this block; otherwise append to the block's content.
+
     const el = document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null;
     const sel = window.getSelection();
+    // Build the chip element to insert at the caret.
+    const chip = document.createElement('span');
+    chip.className = 'tx-cite';
+    chip.setAttribute('contenteditable', 'false');
+    chip.setAttribute('data-cite', ref.id);
+    chip.textContent = '…'; // placeholder; re-render fills the marker
+
     if (el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
       const range = sel.getRangeAt(0);
       range.deleteContents();
-      range.insertNode(document.createTextNode(token));
-      range.collapse(false);
-      patchBlock(c.blockId, { content: el.innerHTML } as Partial<DocumentBlock>);
+      range.insertNode(chip);
+      // move caret after the chip
+      range.setStartAfter(chip); range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+      // Store tokenized content (chips -> [[cite:id]]).
+      const tokenized = tokensFromEl(el);
+      patchBlock(c.blockId, { content: tokenized } as Partial<DocumentBlock>);
     } else {
       const cur = target.content;
-      patchBlock(c.blockId, { content: `${cur} ${token}` } as Partial<DocumentBlock>);
+      patchBlock(c.blockId, { content: `${cur} [[cite:${ref.id}]]` } as Partial<DocumentBlock>);
     }
     setPool((p) => (p.some((r) => r.id === ref.id) ? p : [...p, ref]));
   }
@@ -231,15 +262,10 @@ export function EditorScreen() {
                   </button>
                   <div className="flex-1 min-w-0">
                     <BlockView block={b}
+                      markers={markers}
                       onChange={(patch) => patchBlock(b.id, patch)}
                       onDelete={() => deleteBlock(b.id)}
                       onFocusCursor={(blockId, get) => { cursor.current = { blockId, get }; }} />
-                    {/* citation preview for paragraphs */}
-                    {b.type === 'paragraph' && /\[\[cite:/.test(b.content) && (
-                      <div className="text-[11px] text-[var(--color-faint)] mt-0.5 italic">
-                        Cited as: {renderCitations(b.content, markers).match(/\[[^\]]+\]|\([^)]+\)/g)?.join(' ') ?? ''}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

@@ -31,9 +31,14 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
 
   async function handleCreateFolder() {
     if (!newFolder.trim()) return;
-    await createFolder(newFolder.trim());
-    setNewFolder(''); setAddingFolder(false);
-    listFolders().then(setFolders);
+    try {
+      await createFolder(newFolder.trim());
+      setNewFolder(''); setAddingFolder(false);
+      const fs = await listFolders();
+      setFolders(fs);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not create folder.');
+    }
   }
 
   async function submit() {
@@ -166,6 +171,9 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
               <div className="text-[11px] text-[var(--color-muted)] mt-0.5 truncate">
                 {r.authors[0]?.split(',')[0] ?? 'Unknown'}{r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? 'n.d.'}
               </div>
+              <code className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] text-[var(--color-accent)] font-mono">
+                {r.citeKey}
+              </code>
             </button>
             <button onClick={async () => { await removeReference(r.id); refresh(); }} aria-label="Remove"
               className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-faint)] hover:text-[var(--status-error)] cursor-pointer border-none bg-transparent p-0 mt-1">

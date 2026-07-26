@@ -1,10 +1,8 @@
 /**
  * Rich-text paragraph editor (contentEditable).
- *
- * Stores HTML (bold/italic/sup/sub) in block.content. A floating toolbar
- * appears on text selection with the manuscript-relevant controls plus a
- * symbol inserter. Citation tokens [[cite:id]] are preserved as plain text
- * inside the HTML and still resolve at render/export time.
+ * Stores HTML with [[cite:id]] tokens. For DISPLAY, tokens render as
+ * non-editable "chips" showing the resolved marker ([1] or (Author, year)).
+ * On save, chips convert back to tokens so stored format stays token-based.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Bold, Italic, Superscript, Subscript, Sigma } from 'lucide-react';
@@ -14,10 +12,29 @@ const SYMBOLS = [
   '±','×','÷','≤','≥','≠','≈','→','←','↔','∞','°','·','∑','∫','√','∂','∇','∝','∈',
 ];
 
+const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
+
 function exec(cmd: string) { document.execCommand(cmd, false); }
 
-export function RichParagraph({ html, onChange, onFocusCursor, blockId }: {
+function tokensToChips(html: string, markers: Map<string, string>): string {
+  return html.replace(CITE_RE, (_, id) => {
+    const label = markers.get(id) ?? '[?]';
+    return `<span class="tx-cite" contenteditable="false" data-cite="${id}">${label}</span>`;
+  });
+}
+
+function chipsToTokens(node: HTMLElement): string {
+  const clone = node.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('span.tx-cite').forEach((el) => {
+    const id = el.getAttribute('data-cite');
+    el.replaceWith(document.createTextNode(`[[cite:${id}]]`));
+  });
+  return clone.innerHTML;
+}
+
+export function RichParagraph({ html, markers, onChange, onFocusCursor, blockId }: {
   html: string;
+  markers: Map<string, string>;
   onChange: (html: string) => void;
   onFocusCursor?: (blockId: string) => void;
   blockId: string;
@@ -25,15 +42,20 @@ export function RichParagraph({ html, onChange, onFocusCursor, blockId }: {
   const ref = useRef<HTMLDivElement>(null);
   const [showSymbols, setShowSymbols] = useState(false);
 
-  // Initialize content once (avoid clobbering cursor on every render).
   useEffect(() => {
-    if (ref.current && ref.current.innerHTML !== html) {
-      ref.current.innerHTML = html;
-    }
+    if (ref.current) ref.current.innerHTML = tokensToChips(html, markers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function emit() { if (ref.current) onChange(ref.current.innerHTML); }
+  useEffect(() => {
+    const el = ref.current;
+    if (el && document.activeElement !== el) {
+      el.innerHTML = tokensToChips(chipsToTokens(el), markers);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [markers]);
+
+  function emit() { if (ref.current) onChange(chipsToTokens(ref.current)); }
 
   function insertSymbol(sym: string) {
     ref.current?.focus();
@@ -47,7 +69,6 @@ export function RichParagraph({ html, onChange, onFocusCursor, blockId }: {
 
   return (
     <div className="relative">
-      {/* formatting toolbar */}
       <div className="flex items-center gap-0.5 mb-1 opacity-60 hover:opacity-100 transition-opacity">
         <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('bold'); emit(); }} className={btn} aria-label="Bold"><Bold size={14} /></button>
         <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('italic'); emit(); }} className={btn} aria-label="Italic"><Italic size={14} /></button>

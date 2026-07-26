@@ -19,6 +19,9 @@ export type BlockType =
  *  plus the raw cslJson for BibTeX/export. Lives in the account-level pool. */
 export interface Reference {
   id: string;
+  /** Human-readable BibTeX-style cite key (e.g. "vicente2011"). Used for
+   *  \cite{key}-style citing and shown to the user; unique per pool. */
+  citeKey: string;
   title: string;
   authors: string[];      // ["Leopold, L. B.", "Langbein, W. B."]
   year: number | null;

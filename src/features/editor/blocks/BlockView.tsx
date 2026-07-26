@@ -57,13 +57,15 @@ export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlo
   );
 }
 
-export function ParagraphView({ block, onChange, onDelete, onFocusCursor }: BlockProps<ParagraphBlock> & {
+export function ParagraphView({ block, onChange, onDelete, onFocusCursor, markers }: BlockProps<ParagraphBlock> & {
   onFocusCursor?: (blockId: string, getCursor: () => number) => void;
+  markers: Map<string, string>;
 }) {
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <RichParagraph html={block.content}
         blockId={block.id}
+        markers={markers}
         onChange={(content) => onChange({ content } as Partial<ParagraphBlock>)}
         onFocusCursor={(bid) => onFocusCursor?.(bid, () => 0)} />
     </BlockShell>
@@ -153,12 +155,13 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
   );
 }
 
-export function BlockView({ block, onChange, onDelete, onFocusCursor }: BlockProps<DocumentBlock> & {
+export function BlockView({ block, onChange, onDelete, onFocusCursor, markers }: BlockProps<DocumentBlock> & {
   onFocusCursor?: (blockId: string, getCursor: () => number) => void;
+  markers: Map<string, string>;
 }) {
   switch (block.type) {
     case 'section': return <SectionView block={block} onChange={onChange} onDelete={onDelete} />;
-    case 'paragraph': return <ParagraphView block={block} onChange={onChange} onDelete={onDelete} onFocusCursor={onFocusCursor} />;
+    case 'paragraph': return <ParagraphView block={block} onChange={onChange} onDelete={onDelete} onFocusCursor={onFocusCursor} markers={markers} />;
     case 'equation': return <EquationView block={block} onChange={onChange} onDelete={onDelete} />;
     case 'figure': return <FigureView block={block} onChange={onChange} onDelete={onDelete} />;
     case 'table': return <TableView block={block} onChange={onChange} onDelete={onDelete} />;

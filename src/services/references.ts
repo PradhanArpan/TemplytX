@@ -16,6 +16,7 @@ let folders: ReferenceFolder[] = [];
 let pool: Reference[] = [
   {
     id: 'ref-seed-1',
+    citeKey: 'leopold1966',
     title: 'River meanders and the theory of minimum variance',
     authors: ['Leopold, L. B.', 'Langbein, W. B.'],
     year: 1966,
@@ -24,6 +25,17 @@ let pool: Reference[] = [
     cslJson: {},
   },
 ];
+
+/** Generate a clean, unique BibTeX-style key from author surname + year. */
+function makeCiteKey(authors: string[], year: number | null, existing: Reference[]): string {
+  const surname = (authors[0]?.split(',')[0] ?? 'ref')
+    .toLowerCase().replace(/[^a-z]/g, '') || 'ref';
+  const base = `${surname}${year ?? ''}`;
+  let key = base; let n = 0;
+  const taken = new Set(existing.map((r) => r.citeKey));
+  while (taken.has(key)) { n++; key = `${base}${String.fromCharCode(96 + n)}`; }
+  return key;
+}
 
 async function uid(): Promise<string | null> {
   if (!SUPABASE_READY || !supabase) return null;
@@ -51,15 +63,25 @@ export function listReferencesSync(): Reference[] {
   return [...pool];
 }
 
-export async function addReference(ref: Omit<Reference, 'id'>): Promise<Reference> {
+export async function addReference(
+  ref: Omit<Reference, 'id' | 'citeKey'> & { citeKey?: string },
+): Promise<Reference> {
+  // Ensure a clean, unique cite key (use provided BibTeX key, else generate).
+  let citeKey = (ref.citeKey ?? '').trim().replace(/[^A-Za-z0-9]/g, '');
+  const taken = new Set(pool.map((r) => r.citeKey));
+  if (!citeKey || taken.has(citeKey)) {
+    citeKey = makeCiteKey(ref.authors, ref.year, pool);
+  }
+  const withKey = { ...ref, citeKey };
+
   const u = await uid();
   if (!u || !supabase) {
-    const r: Reference = { ...ref, id: `ref-${crypto.randomUUID()}` };
+    const r: Reference = { ...withKey, id: `ref-${crypto.randomUUID()}` };
     pool.unshift(r);
     return r;
   }
   const { data, error } = await supabase
-    .from('reference_pool').insert({ owner_id: u, data: ref }).select('id, data').single();
+    .from('reference_pool').insert({ owner_id: u, data: withKey }).select('id, data').single();
   if (error) throw error;
   const r: Reference = { ...(data.data as Reference), id: data.id };
   pool.unshift(r);
@@ -77,7 +99,7 @@ export async function removeReference(id: string): Promise<void> {
 }
 
 // --- DOI auto-fetch via Crossref (public, no key) ----------------------------
-export async function fetchByDoi(doiRaw: string): Promise<Omit<Reference, 'id'>> {
+export async function fetchByDoi(doiRaw: string): Promise<Omit<Reference, 'id' | 'citeKey'>> {
   const doi = doiRaw.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//, '');
   const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
   if (!res.ok) throw new Error('DOI not found');
@@ -99,7 +121,7 @@ export async function fetchByDoi(doiRaw: string): Promise<Omit<Reference, 'id'>>
 }
 
 // --- minimal BibTeX parse (one entry, common fields) -------------------------
-export function parseBibtex(src: string): Omit<Reference, 'id'> {
+export function parseBibtex(src: string): Omit<Reference, 'id' | 'citeKey'> & { citeKey?: string } {
   const field = (name: string) => {
     const re = new RegExp(`${name}\\s*=\\s*[{"]([^}"]*)[}"]`, 'i');
     return src.match(re)?.[1]?.trim();
@@ -107,7 +129,9 @@ export function parseBibtex(src: string): Omit<Reference, 'id'> {
   const authorsRaw = field('author') ?? '';
   const authors = authorsRaw ? authorsRaw.split(/\s+and\s+/).map((a) => a.trim()) : [];
   const y = field('year');
+  const keyMatch = src.match(/@\w+\s*\{\s*([^,\s]+)/);
   return {
+    citeKey: keyMatch?.[1],
     title: field('title') ?? 'Untitled',
     authors,
     year: y ? parseInt(y, 10) : null,
@@ -119,14 +143,9 @@ export function parseBibtex(src: string): Omit<Reference, 'id'> {
 }
 
 // --- BibTeX generation for export --------------------------------------------
-function citeKey(r: Reference): string {
-  const first = r.authors[0]?.split(',')[0]?.replace(/\W/g, '') ?? 'ref';
-  return `${first}${r.year ?? ''}`;
-}
-
 export function toBibtex(refs: Reference[]): string {
   return refs.map((r) => {
-    const key = citeKey(r);
+    const key = r.citeKey;
     const lines = [
       `  title = {${r.title}}`,
       r.authors.length ? `  author = {${r.authors.join(' and ')}}` : null,
