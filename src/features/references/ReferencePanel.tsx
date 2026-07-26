@@ -30,11 +30,11 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
     try {
       if (mode === 'doi') {
         const data = await fetchByDoi(input);
-        addReference(data);
+        await addReference(data);
       } else if (mode === 'bibtex') {
-        addReference(parseBibtex(input));
+        await addReference(parseBibtex(input));
       } else {
-        addReference({
+        await addReference({
           title: manual.title || 'Untitled',
           authors: manual.authors ? manual.authors.split(';').map((a) => a.trim()) : [],
           year: manual.year ? parseInt(manual.year, 10) : null,
@@ -125,7 +125,7 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
                 {r.authors[0]?.split(',')[0] ?? 'Unknown'}{r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? 'n.d.'}
               </div>
             </button>
-            <button onClick={() => { removeReference(r.id); refresh(); }} aria-label="Remove"
+            <button onClick={async () => { await removeReference(r.id); refresh(); }} aria-label="Remove"
               className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-faint)] hover:text-[var(--status-error)] cursor-pointer border-none bg-transparent p-0 mt-1">
               <Trash2 size={12} />
             </button>

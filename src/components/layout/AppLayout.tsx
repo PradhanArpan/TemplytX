@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { Moon, Sun, Command as CommandIcon } from 'lucide-react';
+import { Moon, Sun, Command as CommandIcon, LogOut } from 'lucide-react';
 import { getTheme, toggleTheme } from '../../lib/theme';
 import { CommandPalette } from '../ui/CommandPalette';
+import { useAuth } from '../../lib/auth';
 
 export function AppLayout() {
   const [theme, setTheme] = useState(getTheme());
@@ -37,11 +38,29 @@ export function AppLayout() {
           <span className="tx-document italic text-[15px] text-[var(--color-muted)] hidden md:inline ml-2">
             Just write.
           </span>
+          <UserMenu />
         </div>
       </header>
 
       <main><Outlet /></main>
       <CommandPalette />
+    </div>
+  );
+}
+
+/** Shows the logged-in user's email + a logout button (only when configured). */
+function UserMenu() {
+  const { user, configured, signOut } = useAuth();
+  if (!configured || !user) return null;
+  return (
+    <div className="flex items-center gap-2 ml-2 pl-2 border-l border-[var(--color-border)]">
+      <span className="text-[12px] text-[var(--color-muted)] hidden sm:inline max-w-[160px] truncate">
+        {user.email}
+      </span>
+      <button onClick={() => signOut()} aria-label="Log out"
+        className="p-2 rounded-[var(--radius)] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] hover:text-[var(--status-error)] transition-colors border-none bg-transparent">
+        <LogOut size={15} />
+      </button>
     </div>
   );
 }

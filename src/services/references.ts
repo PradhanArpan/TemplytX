@@ -1,12 +1,14 @@
 /**
- * Reference pool — account-level library (session-mock now; backend-durable
- * when accounts land). Supports adding by DOI (Crossref auto-fetch), by
- * BibTeX paste, or by manual entry. Generates BibTeX for export.
+ * Reference pool — account-level library. Persists to Supabase when logged in
+ * (durable, Mendeley-style), else session-only. Keeps an in-memory cache so
+ * the synchronous exporters keep working; the cache is a write-through mirror
+ * of the database.
  */
 import type { Reference } from '../types/document';
+import { supabase, SUPABASE_READY } from '../lib/supabase';
 
-// --- session-level pool (resets on hard refresh; persists across nav) --------
-const pool: Reference[] = [
+// In-memory cache (mirror of DB when logged in; the whole pool when not).
+let pool: Reference[] = [
   {
     id: 'ref-seed-1',
     title: 'River meanders and the theory of minimum variance',
@@ -18,24 +20,55 @@ const pool: Reference[] = [
   },
 ];
 
-export async function listReferences(): Promise<Reference[]> {
+async function uid(): Promise<string | null> {
+  if (!SUPABASE_READY || !supabase) return null;
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+
+/** Load the pool from Supabase into the cache (call on login / editor open). */
+export async function loadReferences(): Promise<Reference[]> {
+  const u = await uid();
+  if (!u || !supabase) return [...pool];
+  const { data, error } = await supabase
+    .from('reference_pool').select('id, data').order('created_at', { ascending: false });
+  if (error) throw error;
+  pool = (data ?? []).map((row: { id: string; data: Reference }) => ({ ...row.data, id: row.id }));
   return [...pool];
 }
 
-/** Synchronous accessor for the exporters (which run synchronously). */
+export async function listReferences(): Promise<Reference[]> {
+  return loadReferences();
+}
+
+/** Synchronous accessor for the exporters (reads the cache). */
 export function listReferencesSync(): Reference[] {
   return [...pool];
 }
 
-export function addReference(ref: Omit<Reference, 'id'>): Reference {
-  const r: Reference = { ...ref, id: `ref-${crypto.randomUUID()}` };
+export async function addReference(ref: Omit<Reference, 'id'>): Promise<Reference> {
+  const u = await uid();
+  if (!u || !supabase) {
+    const r: Reference = { ...ref, id: `ref-${crypto.randomUUID()}` };
+    pool.unshift(r);
+    return r;
+  }
+  const { data, error } = await supabase
+    .from('reference_pool').insert({ owner_id: u, data: ref }).select('id, data').single();
+  if (error) throw error;
+  const r: Reference = { ...(data.data as Reference), id: data.id };
   pool.unshift(r);
   return r;
 }
 
-export function removeReference(id: string) {
+export async function removeReference(id: string): Promise<void> {
   const i = pool.findIndex((r) => r.id === id);
   if (i !== -1) pool.splice(i, 1);
+  const u = await uid();
+  if (u && supabase) {
+    const { error } = await supabase.from('reference_pool').delete().eq('id', id);
+    if (error) throw error;
+  }
 }
 
 // --- DOI auto-fetch via Crossref (public, no key) ----------------------------
