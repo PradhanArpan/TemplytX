@@ -7,6 +7,7 @@ import { useRef, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { RichParagraph } from './RichParagraph';
+import { ImageInput } from './ImageInput';
 import type {
   DocumentBlock, SectionBlock, ParagraphBlock,
   EquationBlock, FigureBlock, TableBlock,
@@ -179,11 +180,6 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
     onChange({ subfigures: subs.map((s) => (s.id === sfId ? { ...s, caption: v } : s)) } as Partial<FigureBlock>);
   }
 
-  const placeholder = (label: string) => (
-    <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--color-surface-2)', color: 'var(--color-faint)',
-      fontFamily: 'var(--font-ui)', fontSize: 'var(--text-sm)' }}>{label}</div>
-  );
 
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
@@ -207,13 +203,16 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
         </div>
 
         {subs.length === 0 ? (
-          placeholder(block.src ? 'Image' : 'Figure placeholder — image upload comes with the backend')
+          <div className="p-2">
+            <ImageInput src={block.src} onChange={(url) => onChange({ src: url } as Partial<FigureBlock>)} />
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2 p-2 justify-center">
             {subs.map((s, i) => (
               <div key={s.id} className="border border-[var(--color-border)] rounded overflow-hidden"
                 style={{ flex: '0 0 auto', width: `calc((100% - ${((block.perRow ?? 2) - 1) * 8}px) / ${block.perRow ?? 2})` }}>
-                {placeholder(`(${String.fromCharCode(97 + i)})`)}
+                <ImageInput src={s.src} height={90}
+                  onChange={(url) => onChange({ subfigures: subs.map((x) => x.id === s.id ? { ...x, src: url } : x) } as Partial<FigureBlock>)} />
                 <div className="p-1.5">
                   <input value={s.caption} placeholder={`(${String.fromCharCode(97 + i)}) caption`}
                     onChange={(e) => setSubCaption(s.id, e.target.value)}
