@@ -101,9 +101,6 @@ export function ExportScreen() {
           </optgroup>;
         })}
       </select>
-      <p className="text-[12px] text-[var(--color-muted)] mb-6">
-        Write once, export to any format. Rejected by one journal? Re-export to another — no rewrite.
-      </p>
 
       {/* compliance against the chosen target */}
       <Card className="p-4 flex items-center gap-4 mb-6">

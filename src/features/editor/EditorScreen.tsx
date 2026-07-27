@@ -5,7 +5,7 @@ import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical } from 'lu
 import { getDocument, updateDocument, listTemplates } from '../../services/documents';
 import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
-import { orderedReferences, markerMap, formatEntry } from '../references/format';
+import { orderedReferences, markerMap, formatEntry, crossRefMap } from '../references/format';
 import { ReferencePanel } from '../references/ReferencePanel';
 import type { TemplytXDocument, DocumentBlock, Reference } from '../../types/document';
 import type { Template, ComplianceReport } from '../../types/compliance';
@@ -20,12 +20,14 @@ import type { Author } from '../../types/document';
 const paneLabel =
   'text-[12px] tracking-[0.06em] uppercase text-[var(--color-faint)] font-semibold mb-3';
 
-/** Convert chip spans in a DOM element back to [[cite:id]] tokens. */
+/** Convert chip spans in a DOM element back to tokens. */
 function tokensFromEl(node: HTMLElement): string {
   const clone = node.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('span.tx-cite').forEach((el) => {
-    const id = el.getAttribute('data-cite');
-    el.replaceWith(document.createTextNode(`[[cite:${id}]]`));
+    el.replaceWith(document.createTextNode(`[[cite:${el.getAttribute('data-cite')}]]`));
+  });
+  clone.querySelectorAll('span.tx-xref').forEach((el) => {
+    el.replaceWith(document.createTextNode(`[[ref:${el.getAttribute('data-ref')}]]`));
   });
   return clone.innerHTML;
 }
@@ -89,9 +91,14 @@ export function EditorScreen() {
     if (typeof (patch as { content?: string }).content === 'string') {
       let content = (patch as { content: string }).content;
       if (content.includes('\\cite{')) {
-        content = content.replace(/\\cite\{([^}]+)\}/g, (whole, key) => {
-          const ref = pool.find((r) => r.citeKey === key.trim());
-          return ref ? `[[cite:${ref.id}]]` : whole;
+        // Support \cite{keyA,keyB,keyC} -> consecutive citation tokens.
+        content = content.replace(/\\cite\{([^}]+)\}/g, (whole, keys) => {
+          const tokens = String(keys).split(',').map((k) => {
+            const ref = pool.find((r) => r.citeKey === k.trim());
+            return ref ? `[[cite:${ref.id}]]` : null;
+          });
+          // Only convert if every key resolved; else leave text untouched.
+          return tokens.every(Boolean) ? tokens.join('') : whole;
         });
         (patch as { content: string }).content = content;
       }
@@ -175,6 +182,25 @@ export function EditorScreen() {
     setPool((p) => (p.some((r) => r.id === ref.id) ? p : [...p, ref]));
   }
 
+  function insertXref(targetId: string) {
+    const c = cursor.current;
+    const el = c ? document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null : null;
+    const sel = window.getSelection();
+    if (c && el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+      const chip = document.createElement('span');
+      chip.className = 'tx-xref';
+      chip.setAttribute('contenteditable', 'false');
+      chip.setAttribute('data-ref', targetId);
+      chip.textContent = crossRefs.get(targetId) ?? 'Ref. ?';
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(chip);
+      range.setStartAfter(chip); range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+      patchBlock(c.blockId, { content: tokensFromEl(el) } as Partial<DocumentBlock>);
+    }
+  }
+
   async function checkCompliance() {
     if (!doc || !tpl) return;
     const required = tpl.sections.filter((s) => s.required).map((s) => s.title);
@@ -207,6 +233,7 @@ export function EditorScreen() {
   const sections = blocks.filter((b) => b.type === 'section');
   const score = report ? report.score : doc.readinessScore;
   const markers = markerMap(blocks, pool, tpl);
+  const crossRefs = crossRefMap(blocks);
   const refList = orderedReferences(blocks, pool, tpl);
 
   return (
@@ -240,7 +267,17 @@ export function EditorScreen() {
             el.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }} />
-        <span className="text-[11px] text-[var(--color-faint)]">Select text in any paragraph, then format — like Word.</span>
+        {crossRefs.size > 0 && (
+          <select
+            onChange={(e) => { if (e.target.value) { insertXref(e.target.value); e.target.value = ''; } }}
+            defaultValue=""
+            className="text-[12px] px-2 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer outline-none">
+            <option value="" disabled>Insert reference to…</option>
+            {[...crossRefs.entries()].map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="grid grid-cols-[210px_1fr_276px] flex-1 min-h-0">
@@ -281,6 +318,7 @@ export function EditorScreen() {
                   <div className="flex-1 min-w-0">
                     <BlockView block={b}
                       markers={markers}
+                      crossRefs={crossRefs}
                       onChange={(patch) => patchBlock(b.id, patch)}
                       onDelete={() => deleteBlock(b.id)}
                       onFocusCursor={(blockId, get) => { cursor.current = { blockId, get }; }} />

@@ -148,3 +148,15 @@ a { color: var(--color-accent); text-decoration: none; }
   cursor: default;
   user-select: none;
 }
+
+/* Cross-reference chips (Fig./Table/Eq. links) — subtler than citations. */
+.tx-xref {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-size: 0.92em;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}

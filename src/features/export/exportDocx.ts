@@ -11,7 +11,7 @@ import { saveAs } from 'file-saver';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { computeNumbering } from './numbering';
-import { markerMap, renderCitations, orderedReferences, formatEntry } from '../references/format';
+import { markerMap, renderCitations, orderedReferences, formatEntry, sanitizeInlineHtml, crossRefMap, renderCrossRefs } from '../references/format';
 import { listReferencesSync } from '../../services/references';
 
 const lineMap = { single: 240, onehalf: 360, double: 480 };
@@ -53,6 +53,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
   const half = fmt.bodyFontPt * 2; // docx uses half-points
   const pool = listReferencesSync();
   const markers = markerMap(doc.blocks, pool, tpl);
+  const xrefs = crossRefMap(doc.blocks);
   const refList = orderedReferences(doc.blocks, pool, tpl);
 
   const children: (Paragraph | Table)[] = [
@@ -99,7 +100,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
     } else if (b.type === 'paragraph') {
       children.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        children: htmlToRuns(renderCitations(b.content, markers), half),
+        children: htmlToRuns(renderCrossRefs(renderCitations(sanitizeInlineHtml(b.content), markers), xrefs), half),
         spacing: { after: 120, line: lineMap[fmt.lineSpacing] },
       }));
     } else if (b.type === 'equation') {

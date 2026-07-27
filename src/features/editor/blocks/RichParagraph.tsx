@@ -1,32 +1,38 @@
 /**
- * Rich-text paragraph editor (contentEditable). Formatting is driven by the
- * shared top toolbar (see EditorToolbar) which acts on the focused block, so
- * this component no longer carries its own toolbar. It renders [[cite:id]]
- * tokens as non-editable chips and converts back to tokens on save.
+ * Rich-text paragraph editor (contentEditable). Formatting comes from the
+ * shared top toolbar. Renders two kinds of non-editable chips:
+ *   [[cite:id]] -> citation marker ([1] / (Author, year))
+ *   [[ref:id]]  -> cross-reference to a figure/table/equation ("Fig. 2")
+ * and converts both back to tokens on save.
  */
 import { useEffect, useRef } from 'react';
 
 const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
+const REF_RE = /\[\[ref:([a-z0-9-]+)\]\]/gi;
 
-function tokensToChips(html: string, markers: Map<string, string>): string {
-  return html.replace(CITE_RE, (_, id) => {
-    const label = markers.get(id) ?? '[?]';
-    return `<span class="tx-cite" contenteditable="false" data-cite="${id}">${label}</span>`;
-  });
+function tokensToChips(html: string, markers: Map<string, string>, refs: Map<string, string>): string {
+  return html
+    .replace(CITE_RE, (_, id) =>
+      `<span class="tx-cite" contenteditable="false" data-cite="${id}">${markers.get(id) ?? '[?]'}</span>`)
+    .replace(REF_RE, (_, id) =>
+      `<span class="tx-xref" contenteditable="false" data-ref="${id}">${refs.get(id) ?? 'Ref. ?'}</span>`);
 }
 
 function chipsToTokens(node: HTMLElement): string {
   const clone = node.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('span.tx-cite').forEach((el) => {
-    const id = el.getAttribute('data-cite');
-    el.replaceWith(document.createTextNode(`[[cite:${id}]]`));
+    el.replaceWith(document.createTextNode(`[[cite:${el.getAttribute('data-cite')}]]`));
+  });
+  clone.querySelectorAll('span.tx-xref').forEach((el) => {
+    el.replaceWith(document.createTextNode(`[[ref:${el.getAttribute('data-ref')}]]`));
   });
   return clone.innerHTML;
 }
 
-export function RichParagraph({ html, markers, onChange, onFocusCursor, blockId }: {
+export function RichParagraph({ html, markers, crossRefs, onChange, onFocusCursor, blockId }: {
   html: string;
   markers: Map<string, string>;
+  crossRefs: Map<string, string>;
   onChange: (html: string) => void;
   onFocusCursor?: (blockId: string) => void;
   blockId: string;
@@ -34,17 +40,17 @@ export function RichParagraph({ html, markers, onChange, onFocusCursor, blockId 
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (ref.current) ref.current.innerHTML = tokensToChips(html, markers);
+    if (ref.current) ref.current.innerHTML = tokensToChips(html, markers, crossRefs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const el = ref.current;
     if (el && document.activeElement !== el) {
-      el.innerHTML = tokensToChips(chipsToTokens(el), markers);
+      el.innerHTML = tokensToChips(chipsToTokens(el), markers, crossRefs);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markers]);
+  }, [markers, crossRefs]);
 
   function emit() { if (ref.current) onChange(chipsToTokens(ref.current)); }
 

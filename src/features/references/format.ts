@@ -105,3 +105,23 @@ export function sanitizeInlineHtml(html: string): string {
   walk(src, out);
   return out.innerHTML;
 }
+
+// --- cross-references to figures / tables / equations ------------------------
+import { computeNumbering } from '../export/numbering';
+
+export const REF_RE = /\[\[ref:([a-z0-9-]+)\]\]/gi;
+
+/** Map of blockId -> in-text label ("Fig. 2", "Table 1", "Eq. (3)"). */
+export function crossRefMap(blocks: DocumentBlock[]): Map<string, string> {
+  const num = computeNumbering(blocks, false);
+  const map = new Map<string, string>();
+  num.figures.forEach((n, id) => map.set(id, `Fig. ${n}`));
+  num.tables.forEach((n, id) => map.set(id, `Table ${n}`));
+  num.equations.forEach((n, id) => map.set(id, `Eq. (${n})`));
+  return map;
+}
+
+/** Replace [[ref:id]] tokens with their label. */
+export function renderCrossRefs(text: string, labels: Map<string, string>): string {
+  return text.replace(REF_RE, (_, id) => labels.get(id) ?? 'Ref. ?');
+}

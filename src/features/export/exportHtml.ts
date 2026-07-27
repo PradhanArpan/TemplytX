@@ -8,7 +8,7 @@ import katex from 'katex';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { computeNumbering } from './numbering';
-import { markerMap, renderCitations, orderedReferences, formatEntry, sanitizeInlineHtml } from '../references/format';
+import { markerMap, renderCitations, orderedReferences, formatEntry, sanitizeInlineHtml, crossRefMap, renderCrossRefs } from '../references/format';
 import { listReferencesSync } from '../../services/references';
 
 const esc = (s: string) =>
@@ -22,6 +22,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   const margin = fmt.paperSize === 'a4' ? '2.5cm' : '1in';
   const pool = listReferencesSync();
   const markers = markerMap(doc.blocks, pool, tpl);
+  const xrefs = crossRefMap(doc.blocks);
   const refList = orderedReferences(doc.blocks, pool, tpl);
 
   let secN = 0;
@@ -34,7 +35,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
       case 'paragraph':
         // content is rich HTML; sanitize to allowed inline tags only (so all
         // blocks render identically), then resolve citation tokens.
-        return `<p>${renderCitations(sanitizeInlineHtml(b.content), markers)}</p>`;
+        return `<p>${renderCrossRefs(renderCitations(sanitizeInlineHtml(b.content), markers), xrefs)}</p>`;
       case 'equation': {
         const n = num.equations.get(b.id);
         let math = '';
