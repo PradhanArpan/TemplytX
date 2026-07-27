@@ -46,16 +46,39 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
       }
       case 'figure': {
         const n = num.figures.get(b.id);
-        const img = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"/>`
-          : `<div class="fig-ph">[Figure ${n}]</div>`;
-        return `<figure class="fig">${img}<figcaption><strong>Figure ${n}.</strong> ${esc(b.caption)}</figcaption></figure>`;
+        const subs = b.subfigures ?? [];
+        let inner: string;
+        if (subs.length > 0) {
+          inner = `<div class="subfigs">${subs.map((s, i) => {
+            const img = s.src ? `<img src="${esc(s.src)}" alt=""/>` : `<div class="fig-ph">(${String.fromCharCode(97 + i)})</div>`;
+            const cap = s.caption ? `<div class="subcap">(${String.fromCharCode(97 + i)}) ${esc(s.caption)}</div>` : '';
+            return `<div class="subfig">${img}${cap}</div>`;
+          }).join('')}</div>`;
+        } else {
+          inner = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"/>` : `<div class="fig-ph">[Figure ${n}]</div>`;
+        }
+        return `<figure class="fig">${inner}<figcaption><strong>Figure ${n}.</strong> ${esc(b.caption)}</figcaption></figure>`;
       }
       case 'table': {
         const n = num.tables.get(b.id);
+        const al = b.align ?? [];
+        const rowCount = b.rows.length;
+        const rules = (ri: number) => {
+          const s: string[] = [];
+          if (ri === 0 && b.topRule) s.push('border-top:1.5px solid #000');
+          if (ri === 1 && b.headerRule) s.push('border-top:1px solid #000');
+          if (ri > 0 && b.rowLines) s.push('border-top:0.5px solid #666');
+          if (ri === rowCount - 1 && b.bottomRule) s.push('border-bottom:1.5px solid #000');
+          return s.length ? ` style="${s.join(';')}"` : '';
+        };
         const rows = b.rows.map((r, ri) =>
-          `<tr>${r.map((c) => ri === 0 ? `<th>${esc(c)}</th>` : `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+          `<tr${rules(ri)}>${r.map((c, ci) => {
+            const ta = al[ci] ? ` style="text-align:${al[ci]}"` : '';
+            return ri === 0 ? `<th${ta}>${esc(c)}</th>` : `<td${ta}>${esc(c)}</td>`;
+          }).join('')}</tr>`).join('');
         const cap = b.caption ? ` ${esc(b.caption)}` : '';
-        return `<div class="tbl"><div class="tbl-cap"><strong>Table ${n}.</strong>${cap}</div><table>${rows}</table></div>`;
+        const centered = b.centered ? ' style="text-align:center"' : '';
+        return `<div class="tbl"${centered}><div class="tbl-cap"><strong>Table ${n}.</strong>${cap}</div><table${b.centered ? ' style="margin:0 auto"' : ''}>${rows}</table></div>`;
       }
       default: return '';
     }
@@ -95,11 +118,15 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   figure.fig { margin: 10pt 0; text-align: center; break-inside: avoid; }
   .fig-ph { border: 1px dashed #999; padding: 24pt; color: #777; }
   figure.fig img { max-width: 100%; }
+  .subfigs { display: flex; flex-wrap: wrap; gap: 8pt; justify-content: center; }
+  .subfig { flex: 1; min-width: 30%; }
+  .subfig img { max-width: 100%; }
+  .subcap { font-size: ${fmt.bodyFontPt - 2}pt; font-style: italic; margin-top: 2pt; }
   figcaption { font-size: ${fmt.bodyFontPt - 1}pt; margin-top: 4pt; }
   .tbl { margin: 10pt 0; break-inside: avoid; }
   .tbl-cap { font-size: ${fmt.bodyFontPt - 1}pt; margin-bottom: 4pt; }
   table { border-collapse: collapse; width: 100%; font-size: ${fmt.bodyFontPt - 1}pt; }
-  th, td { border: 1px solid #000; padding: 3pt 6pt; text-align: left; }
+  th, td { padding: 3pt 6pt; text-align: left; }
   @media print { .no-print { display: none; } }
   .toolbar { position: fixed; top: 0; left: 0; right: 0; background: #185FA5; color: #fff;
     padding: 10px 16px; font-family: system-ui, sans-serif; display: flex; gap: 12px;

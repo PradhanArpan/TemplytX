@@ -108,15 +108,58 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
 }
 
 export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock>) {
+  const subs = block.subfigures ?? [];
+  const ctrlBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer transition-colors';
+
+  function addSub() {
+    const next = [...subs, { id: `sf-${crypto.randomUUID()}`, src: '', caption: '' }];
+    onChange({ subfigures: next } as Partial<FigureBlock>);
+  }
+  function removeSub(sfId: string) {
+    onChange({ subfigures: subs.filter((s) => s.id !== sfId) } as Partial<FigureBlock>);
+  }
+  function setSubCaption(sfId: string, v: string) {
+    onChange({ subfigures: subs.map((s) => (s.id === sfId ? { ...s, caption: v } : s)) } as Partial<FigureBlock>);
+  }
+
+  const placeholder = (label: string) => (
+    <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--color-surface-2)', color: 'var(--color-faint)',
+      fontFamily: 'var(--font-ui)', fontSize: 'var(--text-sm)' }}>{label}</div>
+  );
+
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <figure style={{ margin: '8px 0', border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--color-surface)' }}>
-        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--color-surface-2)', color: 'var(--color-faint)',
-          fontFamily: 'var(--font-ui)', fontSize: 'var(--text-sm)' }}>
-          {block.src ? 'Image' : 'Figure placeholder — image upload comes with the backend'}
+        <div className="flex items-center gap-1 p-2 border-b border-[var(--color-border)]">
+          <button className={ctrlBtn} onClick={addSub}>+ Subfigure</button>
+          <span className="text-[10.5px] text-[var(--color-faint)]">
+            {subs.length > 0 ? `${subs.length} subfigure${subs.length === 1 ? '' : 's'}` : 'single image'}
+          </span>
         </div>
+
+        {subs.length === 0 ? (
+          placeholder(block.src ? 'Image' : 'Figure placeholder — image upload comes with the backend')
+        ) : (
+          <div className="flex flex-wrap gap-2 p-2">
+            {subs.map((s, i) => (
+              <div key={s.id} className="flex-1 min-w-[120px] border border-[var(--color-border)] rounded overflow-hidden">
+                {placeholder(`(${String.fromCharCode(97 + i)})`)}
+                <div className="p-1.5">
+                  <input value={s.caption} placeholder={`(${String.fromCharCode(97 + i)}) caption`}
+                    onChange={(e) => setSubCaption(s.id, e.target.value)}
+                    style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 12, fontStyle: 'italic' }} />
+                </div>
+                <button onClick={() => removeSub(s.id)}
+                  className="w-full text-[10.5px] text-[var(--color-faint)] hover:text-[var(--status-error)] cursor-pointer border-none bg-transparent pb-1">
+                  remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <figcaption style={{ padding: '8px 12px' }}>
           <input value={block.caption} placeholder="Figure caption"
             onChange={(e) => onChange({ caption: e.target.value } as Partial<FigureBlock>)}
@@ -128,30 +171,92 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
 }
 
 export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>) {
+  const cols = block.rows[0]?.length ?? 0;
+  const align = block.align ?? Array(cols).fill('left');
+  const ctrlBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer transition-colors';
+  const activeBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-accent)] cursor-pointer';
+
   function setCell(r: number, c: number, v: string) {
     const rows = block.rows.map((row, ri) => ri === r ? row.map((cell, ci) => (ci === c ? v : cell)) : row);
     onChange({ rows } as Partial<TableBlock>);
   }
-  function addRow() { onChange({ rows: [...block.rows, block.rows[0].map(() => '')] } as Partial<TableBlock>); }
+  function addRow() { onChange({ rows: [...block.rows, Array(cols).fill('')] } as Partial<TableBlock>); }
+  function removeRow() { if (block.rows.length > 1) onChange({ rows: block.rows.slice(0, -1) } as Partial<TableBlock>); }
+  function addCol() {
+    onChange({ rows: block.rows.map((row) => [...row, '']), align: [...align, 'left'] } as Partial<TableBlock>);
+  }
+  function removeCol() {
+    if (cols > 1) onChange({
+      rows: block.rows.map((row) => row.slice(0, -1)),
+      align: align.slice(0, -1),
+    } as Partial<TableBlock>);
+  }
+  function setColAlign(c: number, a: 'left' | 'center' | 'right') {
+    const next = [...align]; next[c] = a;
+    onChange({ align: next } as Partial<TableBlock>);
+  }
+  function toggle(key: keyof TableBlock) {
+    onChange({ [key]: !block[key] } as Partial<TableBlock>);
+  }
+
+  const border = '1px solid var(--color-text)';
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <div style={{ margin: '8px 0' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        {/* control bar */}
+        <div className="flex flex-wrap items-center gap-1 mb-2">
+          <button className={ctrlBtn} onClick={addRow}>+ Row</button>
+          <button className={ctrlBtn} onClick={removeRow}>− Row</button>
+          <button className={ctrlBtn} onClick={addCol}>+ Col</button>
+          <button className={ctrlBtn} onClick={removeCol}>− Col</button>
+          <span className="w-px h-4 bg-[var(--color-border)] mx-1" />
+          <button className={block.topRule ? activeBtn : ctrlBtn} onClick={() => toggle('topRule')}>top rule</button>
+          <button className={block.headerRule ? activeBtn : ctrlBtn} onClick={() => toggle('headerRule')}>header rule</button>
+          <button className={block.bottomRule ? activeBtn : ctrlBtn} onClick={() => toggle('bottomRule')}>bottom rule</button>
+          <button className={block.rowLines ? activeBtn : ctrlBtn} onClick={() => toggle('rowLines')}>row lines</button>
+          <button className={block.centered ? activeBtn : ctrlBtn} onClick={() => toggle('centered')}>center</button>
+        </div>
+
+        {/* per-column alignment row */}
+        <div className="flex gap-1 mb-1">
+          {Array.from({ length: cols }).map((_, c) => (
+            <div key={c} className="flex-1 flex justify-center gap-0.5">
+              {(['left', 'center', 'right'] as const).map((a) => (
+                <button key={a} onClick={() => setColAlign(c, a)} title={`Align ${a}`}
+                  className={`text-[10px] px-1 rounded cursor-pointer border ${align[c] === a ? 'border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-transparent text-[var(--color-faint)]'}`}>
+                  {a === 'left' ? '⌷◁' : a === 'center' ? '▷◁' : '▷⌷'}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <table style={{ borderCollapse: 'collapse', width: '100%',
+          margin: block.centered ? '0 auto' : undefined }}>
           <tbody>
             {block.rows.map((row, r) => (
-              <tr key={r}>
+              <tr key={r} style={{
+                borderTop: (r === 0 && block.topRule) ? border
+                  : (r === 1 && block.headerRule) ? border
+                  : (r > 0 && block.rowLines) ? '1px solid var(--color-border)' : undefined,
+                borderBottom: (r === block.rows.length - 1 && block.bottomRule) ? border : undefined,
+              }}>
                 {row.map((cell, c) => (
-                  <td key={c} style={{ border: '1px solid var(--color-border)', padding: 0 }}>
+                  <td key={c} style={{ padding: 0 }}>
                     <input value={cell} onChange={(e) => setCell(r, c, e.target.value)}
-                      style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 14, padding: '6px 9px', fontWeight: r === 0 ? 600 : 400 }} />
+                      style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 14,
+                        padding: '6px 9px', fontWeight: r === 0 ? 600 : 400,
+                        textAlign: align[c] ?? 'left' }} />
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
-        <button onClick={addRow} style={{ border: 'none', background: 'none', cursor: 'pointer',
-          color: 'var(--color-accent)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-ui)', padding: '4px 0' }}>+ Row</button>
+        <input value={block.caption ?? ''} placeholder="Table caption"
+          onChange={(e) => onChange({ caption: e.target.value } as Partial<TableBlock>)}
+          style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 13, fontStyle: 'italic', marginTop: 6,
+            textAlign: block.centered ? 'center' : 'left' }} />
       </div>
     </BlockShell>
   );

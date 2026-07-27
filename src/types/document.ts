@@ -55,11 +55,20 @@ export interface EquationBlock extends BaseBlock {
   label?: string; // e.g. "eq:thermal" for cross-referencing
 }
 
+export interface Subfigure {
+  id: string;
+  src: string;
+  caption: string;
+}
+
 export interface FigureBlock extends BaseBlock {
   type: 'figure';
-  src: string; // storage URL
+  src: string; // storage URL (single-image figure; empty when using subfigures)
   caption: string;
   label?: string;
+  /** Optional multi-image layout; when present, overrides `src`. */
+  subfigures?: Subfigure[];
+  centered?: boolean; // default true
 }
 
 export interface TableBlock extends BaseBlock {
@@ -67,6 +76,14 @@ export interface TableBlock extends BaseBlock {
   rows: string[][];
   caption?: string;
   label?: string;
+  /** Per-column horizontal alignment. Length matches column count. */
+  align?: ('left' | 'center' | 'right')[];
+  /** booktabs-style rules. */
+  topRule?: boolean;      // rule above the first row
+  headerRule?: boolean;   // rule under the header row (row 0)
+  bottomRule?: boolean;   // rule below the last row
+  rowLines?: boolean;     // horizontal line between every row (hline)
+  centered?: boolean;     // center the table block
 }
 
 export type DocumentBlock =
