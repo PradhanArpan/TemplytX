@@ -13,6 +13,7 @@ import { Button, Badge } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Card';
 import { ReadinessGauge } from '../../components/ui/ReadinessGauge';
 import { BlockView } from './blocks/BlockView';
+import { EditorToolbar } from './EditorToolbar';
 import { FrontMatter } from './FrontMatter';
 import type { Author } from '../../types/document';
 
@@ -144,22 +145,28 @@ export function EditorScreen() {
 
     const el = document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null;
     const sel = window.getSelection();
-    // Build the chip element to insert at the caret.
+
+    // Predict the marker this citation will get, so the chip shows it
+    // immediately (no "…" placeholder until export). We simulate the block
+    // content with the new token inserted and recompute the marker map.
+    const poolWith = pool.some((r) => r.id === ref.id) ? pool : [...pool, ref];
     const chip = document.createElement('span');
     chip.className = 'tx-cite';
     chip.setAttribute('contenteditable', 'false');
     chip.setAttribute('data-cite', ref.id);
-    chip.textContent = '…'; // placeholder; re-render fills the marker
 
     if (el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
       const range = sel.getRangeAt(0);
       range.deleteContents();
       range.insertNode(chip);
-      // move caret after the chip
       range.setStartAfter(chip); range.collapse(true);
       sel.removeAllRanges(); sel.addRange(range);
-      // Store tokenized content (chips -> [[cite:id]]).
       const tokenized = tokensFromEl(el);
+      // Recompute markers against the simulated new content + pool.
+      const simBlocks = blocks.map((b) => b.id === c.blockId
+        ? { ...b, content: tokenized } as DocumentBlock : b);
+      const newMarkers = markerMap(simBlocks, poolWith, tpl);
+      chip.textContent = newMarkers.get(ref.id) ?? '[?]';
       patchBlock(c.blockId, { content: tokenized } as Partial<DocumentBlock>);
     } else {
       const cur = target.content;
@@ -223,6 +230,17 @@ export function EditorScreen() {
           </AnimatePresence>
           <Button variant="secondary" size="sm" onClick={() => navigate(`/doc/${id}/export`)}>Export</Button>
         </div>
+      </div>
+
+      {/* Shared formatting toolbar (Word-like) — acts on the focused block. */}
+      <div className="flex items-center gap-2 px-6 h-[44px] border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+        <EditorToolbar onAfter={() => {
+          const el = document.activeElement as HTMLElement | null;
+          if (el && el.getAttribute('contenteditable') === 'true') {
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }} />
+        <span className="text-[11px] text-[var(--color-faint)]">Select text in any paragraph, then format — like Word.</span>
       </div>
 
       <div className="grid grid-cols-[210px_1fr_276px] flex-1 min-h-0">

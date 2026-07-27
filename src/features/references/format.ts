@@ -67,3 +67,41 @@ export function formatEntry(r: Reference, index: number, tpl: Template | null): 
   }
   return `${authors} (${yr}). ${r.title}${cont}.${doi}`;
 }
+
+/**
+ * Sanitize rich-text paragraph HTML for export/consistency: keep only
+ * semantic inline tags (b/strong, i/em, sup, sub) and citation markers;
+ * strip inline styles, fonts, colours, classes, and any block wrappers.
+ * This guarantees every paragraph renders identically — formatting comes
+ * ONLY from the template at export, never from how the text was typed.
+ */
+export function sanitizeInlineHtml(html: string): string {
+  if (typeof document === 'undefined') {
+    // Node fallback: strip all tags except the allowed inline set.
+    return html.replace(/<(?!\/?(b|strong|i|em|sup|sub)\b)[^>]*>/gi, '');
+  }
+  const src = document.createElement('div');
+  src.innerHTML = html;
+  const allowed = new Set(['B', 'STRONG', 'I', 'EM', 'SUP', 'SUB']);
+  const out = document.createElement('div');
+
+  const walk = (node: Node, parent: HTMLElement) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        parent.appendChild(document.createTextNode(child.textContent ?? ''));
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement;
+        if (allowed.has(el.tagName)) {
+          const clean = document.createElement(el.tagName.toLowerCase());
+          parent.appendChild(clean);
+          walk(el, clean);
+        } else {
+          // Unwrap disallowed elements (divs, spans, fonts) but keep contents.
+          walk(el, parent);
+        }
+      }
+    });
+  };
+  walk(src, out);
+  return out.innerHTML;
+}

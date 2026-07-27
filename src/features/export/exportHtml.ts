@@ -8,7 +8,7 @@ import katex from 'katex';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { computeNumbering } from './numbering';
-import { markerMap, renderCitations, orderedReferences, formatEntry } from '../references/format';
+import { markerMap, renderCitations, orderedReferences, formatEntry, sanitizeInlineHtml } from '../references/format';
 import { listReferencesSync } from '../../services/references';
 
 const esc = (s: string) =>
@@ -32,8 +32,9 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         return `<h2 class="sec">${n}${esc(b.title)}</h2>`;
       }
       case 'paragraph':
-        // content is HTML (rich text); render as-is, resolving citation tokens.
-        return `<p>${renderCitations(b.content, markers)}</p>`;
+        // content is rich HTML; sanitize to allowed inline tags only (so all
+        // blocks render identically), then resolve citation tokens.
+        return `<p>${renderCitations(sanitizeInlineHtml(b.content), markers)}</p>`;
       case 'equation': {
         const n = num.equations.get(b.id);
         let math = '';
