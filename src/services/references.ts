@@ -7,10 +7,14 @@
 import type { Reference } from '../types/document';
 import { supabase, SUPABASE_READY } from '../lib/supabase';
 
-export interface ReferenceFolder { id: string; name: string; }
+export interface Label { id: string; name: string; }
+/** @deprecated use Label */
+export type ReferenceFolder = Label;
 
 // In-memory caches (mirror of DB when logged in).
-let folders: ReferenceFolder[] = [];
+let folders: Label[] = [];
+// In-memory label links (labelId -> Set of referenceIds) for mock mode.
+const labelLinks = new Map<string, Set<string>>();
 
 // In-memory cache (mirror of DB when logged in; the whole pool when not).
 let pool: Reference[] = [
@@ -158,28 +162,122 @@ export function toBibtex(refs: Reference[]): string {
   }).join('\n\n');
 }
 
-// --- folders -----------------------------------------------------------------
-export async function listFolders(): Promise<ReferenceFolder[]> {
+// --- labels (account-wide tags; many-to-many with references) ---------------
+export async function listLabels(): Promise<Label[]> {
   const u = await uid();
   if (!u || !supabase) return [...folders];
   const { data, error } = await supabase
     .from('reference_folders').select('id, name').order('created_at');
   if (error) throw error;
-  folders = (data ?? []) as ReferenceFolder[];
+  folders = (data ?? []) as Label[];
   return [...folders];
 }
 
-export async function createFolder(name: string): Promise<ReferenceFolder> {
+export async function createLabel(name: string): Promise<Label> {
   const u = await uid();
   if (!u || !supabase) {
-    const f = { id: `fold-${crypto.randomUUID()}`, name };
+    const f = { id: `label-${crypto.randomUUID()}`, name };
     folders.push(f);
     return f;
   }
   const { data, error } = await supabase
     .from('reference_folders').insert({ owner_id: u, name }).select('id, name').single();
   if (error) throw error;
-  const f = data as ReferenceFolder;
+  const f = data as Label;
   folders.push(f);
   return f;
 }
+
+/** Toggle a label on a reference (add if absent, remove if present). */
+export async function toggleLabel(referenceId: string, labelId: string): Promise<void> {
+  const u = await uid();
+  if (!u || !supabase) {
+    const set = labelLinks.get(labelId) ?? new Set<string>();
+    if (set.has(referenceId)) set.delete(referenceId); else set.add(referenceId);
+    labelLinks.set(labelId, set);
+    return;
+  }
+  const { data } = await supabase.from('reference_label_links')
+    .select('reference_id').eq('reference_id', referenceId).eq('label_id', labelId).maybeSingle();
+  if (data) {
+    await supabase.from('reference_label_links').delete()
+      .eq('reference_id', referenceId).eq('label_id', labelId);
+  } else {
+    await supabase.from('reference_label_links')
+      .insert({ reference_id: referenceId, label_id: labelId, owner_id: u });
+  }
+}
+
+/** The label ids currently attached to a reference. */
+export async function labelsForReference(referenceId: string): Promise<string[]> {
+  const u = await uid();
+  if (!u || !supabase) {
+    const ids: string[] = [];
+    labelLinks.forEach((set, labelId) => { if (set.has(referenceId)) ids.push(labelId); });
+    return ids;
+  }
+  const { data, error } = await supabase.from('reference_label_links')
+    .select('label_id').eq('reference_id', referenceId);
+  if (error) throw error;
+  return (data ?? []).map((r: { label_id: string }) => r.label_id);
+}
+
+/** All references (from the whole account pool) carrying ANY of these labels. */
+export async function referencesByLabels(labelIds: string[]): Promise<Reference[]> {
+  if (labelIds.length === 0) return [];
+  const all = await loadReferences();
+  const u = await uid();
+  if (!u || !supabase) {
+    const wanted = new Set<string>();
+    labelIds.forEach((lid) => labelLinks.get(lid)?.forEach((rid) => wanted.add(rid)));
+    return all.filter((r) => wanted.has(r.id));
+  }
+  const { data, error } = await supabase.from('reference_label_links')
+    .select('reference_id').in('label_id', labelIds);
+  if (error) throw error;
+  const wanted = new Set((data ?? []).map((r: { reference_id: string }) => r.reference_id));
+  return all.filter((r) => wanted.has(r.id));
+}
+
+// --- per-document reference working set --------------------------------------
+// A new document starts empty; references join when cited or pulled in.
+const docRefs = new Map<string, Set<string>>(); // mock-mode cache
+
+export async function listDocumentReferences(documentId: string): Promise<Reference[]> {
+  const all = await loadReferences();
+  const u = await uid();
+  if (!u || !supabase) {
+    const set = docRefs.get(documentId) ?? new Set<string>();
+    return all.filter((r) => set.has(r.id));
+  }
+  const { data, error } = await supabase.from('document_references')
+    .select('reference_id').eq('document_id', documentId);
+  if (error) throw error;
+  const set = new Set((data ?? []).map((r: { reference_id: string }) => r.reference_id));
+  return all.filter((r) => set.has(r.id));
+}
+
+export async function addReferenceToDocument(documentId: string, referenceId: string): Promise<void> {
+  const u = await uid();
+  if (!u || !supabase) {
+    const set = docRefs.get(documentId) ?? new Set<string>();
+    set.add(referenceId); docRefs.set(documentId, set);
+    return;
+  }
+  await supabase.from('document_references')
+    .upsert({ document_id: documentId, reference_id: referenceId, owner_id: u });
+}
+
+export async function removeReferenceFromDocument(documentId: string, referenceId: string): Promise<void> {
+  const u = await uid();
+  if (!u || !supabase) {
+    docRefs.get(documentId)?.delete(referenceId);
+    return;
+  }
+  await supabase.from('document_references').delete()
+    .eq('document_id', documentId).eq('reference_id', referenceId);
+}
+
+// Back-compat aliases (old names used elsewhere).
+export const listFolders = listLabels;
+export const createFolder = createLabel;

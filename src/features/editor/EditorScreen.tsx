@@ -7,6 +7,8 @@ import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
 import { orderedReferences, markerMap, formatEntry, crossRefMap } from '../references/format';
 import { ReferencePanel } from '../references/ReferencePanel';
+import { LabelsPanel } from '../references/LabelsPanel';
+import { addReferenceToDocument } from '../../services/references';
 import type { TemplytXDocument, DocumentBlock, Reference } from '../../types/document';
 import type { Template, ComplianceReport } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
@@ -57,6 +59,7 @@ export function EditorScreen() {
   const [stale, setStale] = useState(false);
   const [saved, setSaved] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [refKey, setRefKey] = useState(0); // bump to refresh the left ref panel
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks the last caret position inside a rich paragraph: the block id and
   // a cloned Range, so we can insert exactly there even after focus moves to
@@ -200,6 +203,8 @@ export function EditorScreen() {
       patchBlock(c.blockId, { content: `${target.content} [[cite:${ref.id}]]` } as Partial<DocumentBlock>);
     }
     setPool((p) => (p.some((r) => r.id === ref.id) ? p : [...p, ref]));
+    // Ensure the cited reference is part of this document's working set.
+    if (id) { addReferenceToDocument(id, ref.id).then(() => setRefKey((k) => k + 1)); }
   }
 
   function insertXref(targetId: string) {
@@ -317,7 +322,7 @@ export function EditorScreen() {
               </button>
             ))}
           </div>
-          <ReferencePanel onCite={cite} />
+          <ReferencePanel documentId={id!} onCite={cite} refreshKey={refKey} />
         </aside>
 
         {/* center: writing surface with reorder + insert */}
@@ -420,6 +425,8 @@ export function EditorScreen() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <LabelsPanel documentId={id!} onPulled={() => setRefKey((k) => k + 1)} />
         </aside>
       </div>
     </div>

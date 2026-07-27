@@ -1,20 +1,26 @@
 /**
- * Reference pool panel (left sidebar, below the outline).
- * Lists the account's reference library; add by DOI / BibTeX / manual;
- * click a reference to cite it at the current cursor position.
+ * Left panel — THIS DOCUMENT'S references (working set).
+ * Starts empty for a new document. A reference joins when you add it here or
+ * pull it in from a Label on the right. Add by DOI / BibTeX / manual.
+ * Click a reference to cite it at the cursor. Cards are compact + uniform.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, BookMarked, Loader2 } from 'lucide-react';
+import { Plus, Trash2, BookMarked, Loader2, Tag } from 'lucide-react';
 import {
-  listReferences, addReference, removeReference, fetchByDoi, parseBibtex,
-  listFolders, createFolder, type ReferenceFolder,
+  addReference, fetchByDoi, parseBibtex,
+  listDocumentReferences, addReferenceToDocument, removeReferenceFromDocument,
+  listLabels, toggleLabel, labelsForReference, type Label,
 } from '../../services/references';
 import type { Reference } from '../../types/document';
 
 type Mode = 'doi' | 'bibtex' | 'manual';
 
-export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void }) {
+export function ReferencePanel({ documentId, onCite, refreshKey }: {
+  documentId: string;
+  onCite: (ref: Reference) => void;
+  refreshKey: number;
+}) {
   const [refs, setRefs] = useState<Reference[]>([]);
   const [adding, setAdding] = useState(false);
   const [mode, setMode] = useState<Mode>('doi');
@@ -23,41 +29,46 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
   const [err, setErr] = useState('');
   const [manual, setManual] = useState({ title: '', authors: '', year: '', container: '' });
 
-  const refresh = () => listReferences().then(setRefs);
-  const [folders, setFolders] = useState<ReferenceFolder[]>([]);
-  const [newFolder, setNewFolder] = useState('');
-  const [addingFolder, setAddingFolder] = useState(false);
-  useEffect(() => { refresh(); listFolders().then(setFolders); }, []);
+  const refresh = useCallback(() => {
+    listDocumentReferences(documentId).then(setRefs);
+  }, [documentId]);
+  useEffect(() => { refresh(); }, [refresh, refreshKey]);
 
-  async function handleCreateFolder() {
-    if (!newFolder.trim()) return;
-    try {
-      await createFolder(newFolder.trim());
-      setNewFolder(''); setAddingFolder(false);
-      const fs = await listFolders();
-      setFolders(fs);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not create folder.');
-    }
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [tagFor, setTagFor] = useState<string | null>(null); // ref id whose tag menu is open
+  const [tagSet, setTagSet] = useState<Set<string>>(new Set());
+  useEffect(() => { listLabels().then(setLabels); }, [refreshKey]);
+
+  async function openTags(refId: string) {
+    if (tagFor === refId) { setTagFor(null); return; }
+    setLabels(await listLabels());
+    const ids = await labelsForReference(refId);
+    setTagSet(new Set(ids));
+    setTagFor(refId);
+  }
+  async function flipTag(refId: string, labelId: string) {
+    await toggleLabel(refId, labelId);
+    setTagSet((prev) => {
+      const n = new Set(prev);
+      if (n.has(labelId)) n.delete(labelId); else n.add(labelId);
+      return n;
+    });
   }
 
   async function submit() {
     setErr(''); setBusy(true);
     try {
-      if (mode === 'doi') {
-        const data = await fetchByDoi(input);
-        await addReference(data);
-      } else if (mode === 'bibtex') {
-        await addReference(parseBibtex(input));
-      } else {
-        await addReference({
-          title: manual.title || 'Untitled',
-          authors: manual.authors ? manual.authors.split(';').map((a) => a.trim()) : [],
-          year: manual.year ? parseInt(manual.year, 10) : null,
-          container: manual.container || undefined,
-          cslJson: {},
-        });
-      }
+      let created: Reference;
+      if (mode === 'doi') created = await addReference(await fetchByDoi(input));
+      else if (mode === 'bibtex') created = await addReference(parseBibtex(input));
+      else created = await addReference({
+        title: manual.title || 'Untitled',
+        authors: manual.authors ? manual.authors.split(';').map((a) => a.trim()) : [],
+        year: manual.year ? parseInt(manual.year, 10) : null,
+        container: manual.container || undefined,
+        cslJson: {},
+      });
+      await addReferenceToDocument(documentId, created.id); // pull into this doc
       setInput(''); setManual({ title: '', authors: '', year: '', container: '' });
       setAdding(false);
       refresh();
@@ -82,37 +93,6 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
         </button>
       </div>
 
-      {/* Folders — organize the account library. Visible across all documents. */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] text-[var(--color-faint)] font-medium">Folders</span>
-          <button onClick={() => setAddingFolder((v) => !v)} aria-label="New folder"
-            className="text-[11px] text-[var(--color-accent)] cursor-pointer border-none bg-transparent p-0">
-            + folder
-          </button>
-        </div>
-        {addingFolder && (
-          <div className="flex gap-1 mb-2">
-            <input autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); }}
-              placeholder="Folder name"
-              className="flex-1 text-[12px] px-2 py-1 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] outline-none focus:border-[var(--color-accent)]" />
-            <button onClick={handleCreateFolder}
-              className="text-[11px] px-2 rounded-[var(--radius)] bg-[var(--color-accent)] text-white border-none cursor-pointer">Add</button>
-          </div>
-        )}
-        {folders.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {folders.map((f) => (
-              <span key={f.id}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--color-surface-2)] text-[var(--color-muted)]">
-                {f.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
       <AnimatePresence>
         {adding && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
@@ -127,7 +107,6 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
                 </button>
               ))}
             </div>
-
             {mode === 'doi' && (
               <input autoFocus value={input} onChange={(e) => setInput(e.target.value)}
                 placeholder="10.1109/... or doi.org link" className={inputCls}
@@ -145,11 +124,10 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
                 <input value={manual.container} onChange={(e) => setManual({ ...manual, container: e.target.value })} placeholder="Journal / source" className={inputCls} />
               </>
             )}
-
             {err && <div className="text-[11px] text-[var(--status-error)] mb-2">{err}</div>}
             <button onClick={submit} disabled={busy}
               className="w-full text-[12px] py-1.5 rounded-[var(--radius)] bg-[var(--color-accent)] text-white border-none cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
-              {busy ? <><Loader2 size={12} className="animate-spin" /> Fetching…</> : 'Add to library'}
+              {busy ? <><Loader2 size={12} className="animate-spin" /> Fetching…</> : 'Add to document'}
             </button>
           </motion.div>
         )}
@@ -157,28 +135,46 @@ export function ReferencePanel({ onCite }: { onCite: (ref: Reference) => void })
 
       {refs.length === 0 && !adding && (
         <div className="flex flex-col items-center text-center py-4 text-[var(--color-faint)]">
-          <BookMarked size={20} strokeWidth={1.5} />
-          <span className="text-[12px] mt-1.5">No references yet</span>
+          <BookMarked size={18} strokeWidth={1.5} />
+          <span className="text-[11px] mt-1.5 leading-snug">No references in this document yet.<br/>Add one, or pull from a Label →</span>
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
+      {/* Compact, uniform reference cards. */}
+      <div className="flex flex-col gap-1">
         {refs.map((r) => (
-          <div key={r.id} className="group border border-[var(--color-border)] rounded-[var(--radius)] p-2 hover:border-[var(--color-border-strong)] transition-colors">
-            <button onClick={() => onCite(r)} title="Click to cite at cursor"
-              className="text-left w-full cursor-pointer border-none bg-transparent p-0">
-              <div className="text-[12px] font-medium text-[var(--color-text)] leading-snug line-clamp-2">{r.title}</div>
-              <div className="text-[11px] text-[var(--color-muted)] mt-0.5 truncate">
-                {r.authors[0]?.split(',')[0] ?? 'Unknown'}{r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? 'n.d.'}
+          <div key={r.id} className="group border border-[var(--color-border)] rounded-[var(--radius)] px-2 py-1.5 hover:border-[var(--color-accent)] transition-colors">
+            <div className="flex items-start gap-1.5">
+              <button onClick={() => onCite(r)} title="Click to cite at cursor"
+                className="text-left flex-1 min-w-0 cursor-pointer border-none bg-transparent p-0">
+                <div className="text-[11.5px] font-medium text-[var(--color-text)] leading-tight truncate">{r.title}</div>
+                <div className="text-[10.5px] text-[var(--color-muted)] truncate">
+                  {r.authors[0]?.split(',')[0] ?? 'Unknown'}{r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? 'n.d.'} · <span className="text-[var(--color-accent)] font-mono">{r.citeKey}</span>
+                </div>
+              </button>
+              <button onClick={() => openTags(r.id)} aria-label="Labels" title="Add labels"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-faint)] hover:text-[var(--color-accent)] cursor-pointer border-none bg-transparent p-0 shrink-0 mt-0.5">
+                <Tag size={11} />
+              </button>
+              <button onClick={async () => { await removeReferenceFromDocument(documentId, r.id); refresh(); }}
+                aria-label="Remove from document"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-faint)] hover:text-[var(--status-error)] cursor-pointer border-none bg-transparent p-0 shrink-0 mt-0.5">
+                <Trash2 size={11} />
+              </button>
+            </div>
+            {tagFor === r.id && (
+              <div className="mt-1.5 pt-1.5 border-t border-[var(--color-border)] flex flex-wrap gap-1">
+                {labels.length === 0 && <span className="text-[10.5px] text-[var(--color-faint)]">No labels yet — create one on the right →</span>}
+                {labels.map((l) => (
+                  <button key={l.id} onClick={() => flipTag(r.id, l.id)}
+                    className={`text-[10.5px] px-1.5 py-0.5 rounded-full cursor-pointer border ${
+                      tagSet.has(l.id) ? 'border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-accent)]'
+                        : 'border-[var(--color-border)] text-[var(--color-muted)] bg-transparent'}`}>
+                    {tagSet.has(l.id) ? '✓ ' : ''}{l.name}
+                  </button>
+                ))}
               </div>
-              <code className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface-2)] text-[var(--color-accent)] font-mono">
-                {r.citeKey}
-              </code>
-            </button>
-            <button onClick={async () => { await removeReference(r.id); refresh(); }} aria-label="Remove"
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-faint)] hover:text-[var(--status-error)] cursor-pointer border-none bg-transparent p-0 mt-1">
-              <Trash2 size={12} />
-            </button>
+            )}
           </div>
         ))}
       </div>
