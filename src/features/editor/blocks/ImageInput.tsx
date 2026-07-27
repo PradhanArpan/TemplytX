@@ -49,12 +49,18 @@ export function ImageInput({ src, onChange, height = 120 }: {
     <div style={{ height, display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', gap: 8, background: 'var(--color-surface-2)', padding: 10 }}>
       {urlMode ? (
-        <div className="flex gap-1 w-full max-w-[280px]">
-          <input autoFocus value={url} onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…/image.png"
-            onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) onChange(url.trim()); }}
-            className="flex-1 text-[12px] px-2 py-1 border border-[var(--color-border-strong)] rounded bg-[var(--color-surface)] outline-none" />
-          <button className={btn} onClick={() => url.trim() && onChange(url.trim())}>Add</button>
+        <div className="flex flex-col gap-1 w-full max-w-[280px]">
+          <div className="flex gap-1">
+            <input autoFocus value={url} onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…/image.png or .svg"
+              onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) onChange(url.trim()); }}
+              className="flex-1 text-[12px] px-2 py-1 border border-[var(--color-border-strong)] rounded bg-[var(--color-surface)] outline-none" />
+            <button className={btn} onClick={() => url.trim() && onChange(url.trim())}>Add</button>
+          </div>
+          <button onClick={() => { setUrlMode(false); setUrl(''); setErr(''); }}
+            className="self-start text-[11px] text-[var(--color-muted)] hover:text-[var(--color-accent)] cursor-pointer border-none bg-transparent p-0">
+            ← back to upload
+          </button>
         </div>
       ) : (
         <div className="flex gap-2">
@@ -66,7 +72,7 @@ export function ImageInput({ src, onChange, height = 120 }: {
       )}
       {!STORAGE_READY && <span className="text-[10.5px] text-[var(--color-faint)]">Uploads need Supabase Storage; URL still works.</span>}
       {err && <span className="text-[10.5px] text-[var(--status-error)]">{err}</span>}
-      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp" className="hidden"
         onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
     </div>
   );

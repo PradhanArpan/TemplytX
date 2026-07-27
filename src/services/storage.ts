@@ -23,7 +23,11 @@ export async function uploadImage(file: File): Promise<string> {
 
 /** Basic client-side validation before upload. */
 export function validateImage(file: File): string | null {
-  if (!file.type.startsWith('image/')) return 'Please choose an image file.';
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.eps') || file.type === 'application/postscript') {
+    return 'EPS can\'t display in browsers/PDF. Export your figure as SVG (vector) or PNG instead.';
+  }
+  if (!file.type.startsWith('image/')) return 'Please choose an image (PNG, JPG, SVG, GIF, or WebP).';
   if (file.size > 5 * 1024 * 1024) return 'Image must be under 5 MB.';
   return null;
 }
