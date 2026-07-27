@@ -75,31 +75,44 @@ export function ParagraphView({ block, onChange, onDelete, onFocusCursor, marker
 }
 
 export function EquationView({ block, onChange, onDelete }: BlockProps<EquationBlock>) {
-  const [editing, setEditing] = useState(block.latex === '');
   const [draft, setDraft] = useState(block.latex);
-  let rendered = ''; let renderError = false;
+  const [focused, setFocused] = useState(false);
+
+  // Live preview of the CURRENT draft (updates as you type).
+  let rendered = ''; let renderError = false; let errorMsg = '';
   try {
-    rendered = katex.renderToString(block.latex || '\\;', { displayMode: true, throwOnError: true });
-  } catch { renderError = true; }
+    rendered = katex.renderToString(draft || '\\;', { displayMode: true, throwOnError: true });
+  } catch (e) { renderError = true; errorMsg = e instanceof Error ? e.message : 'Invalid LaTeX'; }
+
+  function commit(v: string) { setDraft(v); onChange({ latex: v } as Partial<EquationBlock>); }
+
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
-      <div style={{ border: '1px dashed var(--color-border-strong)', borderRadius: 'var(--radius)',
-        padding: '10px 14px', background: 'var(--color-surface)', margin: '6px 0' }}>
-        {editing ? (
-          <input autoFocus value={draft} placeholder="LaTeX, e.g. E = mc^2"
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => { onChange({ latex: draft } as Partial<EquationBlock>); setEditing(false); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-            style={{ ...bare, fontFamily: 'var(--font-mono)', fontSize: 14 }} />
-        ) : (
-          <div onClick={() => { setDraft(block.latex); setEditing(true); }}
-            style={{ cursor: 'text', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {renderError ? (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--status-error)' }}>Invalid LaTeX: {block.latex}</span>
-            ) : (
-              <span dangerouslySetInnerHTML={{ __html: rendered }} />
-            )}
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-xs)', color: 'var(--color-faint)' }}>{block.label ?? 'equation'}</span>
+      <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+        background: 'var(--color-surface)', margin: '6px 0', overflow: 'hidden' }}>
+        {/* live preview */}
+        <div style={{ padding: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+          minHeight: 48, borderBottom: '1px solid var(--color-border)',
+          background: renderError ? 'var(--status-error-bg)' : 'var(--color-bg)' }}>
+          {renderError && draft
+            ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--status-error)' }}>{errorMsg}</span>
+            : <span dangerouslySetInnerHTML={{ __html: rendered }} />}
+        </div>
+        {/* LaTeX source input */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-faint)' }}>ƒx</span>
+          <input value={draft} placeholder="Type LaTeX, e.g. E = mc^2 or \frac{a}{b}"
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            onChange={(e) => commit(e.target.value)}
+            style={{ ...bare, fontFamily: 'var(--font-mono)', fontSize: 13, flex: 1 }} />
+          <input value={block.label ?? ''} placeholder="label (opt.)"
+            onChange={(e) => onChange({ label: e.target.value } as Partial<EquationBlock>)}
+            style={{ ...bare, fontFamily: 'var(--font-ui)', fontSize: 12, width: 90, textAlign: 'right',
+              color: 'var(--color-muted)' }} />
+        </div>
+        {focused && (
+          <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--color-faint)' }}>
+            Live preview above · supports \frac, \sum, \int, ^, _, Greek (\alpha), etc.
           </div>
         )}
       </div>

@@ -122,8 +122,9 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   h2.sec { font-size: ${fmt.bodyFontPt + 1}pt; margin: 12pt 0 4pt; }
   p { margin: 0 0 6pt; text-align: justify; }
   p.ref { padding-left: 1.5em; text-indent: -1.5em; text-align: left; }
-  .eq { display: flex; align-items: center; justify-content: center; gap: 12pt; margin: 8pt 0; }
-  .eq-num { color: #333; }
+  .eq { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: 8pt 0; }
+  .eq-body { grid-column: 2; }
+  .eq-num { grid-column: 3; text-align: right; color: #000; }
   figure.fig { margin: 10pt 0; text-align: center; break-inside: avoid; }
   .fig-ph { border: 1px dashed #999; padding: 24pt; color: #777; }
   figure.fig img { max-width: 100%; }

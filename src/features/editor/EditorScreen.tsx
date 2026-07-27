@@ -306,7 +306,7 @@ export function EditorScreen() {
               onChange={(e) => { if (e.target.value) { insertXref(e.target.value); e.target.value = ''; } }}
               defaultValue=""
               className="text-[12px] px-2 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer outline-none">
-              <option value="" disabled>Insert \ref…</option>
+              <option value="" disabled>Insert \ref</option>
               {figs.length > 0 && (
                 <optgroup label="Figures">
                   {figs.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
