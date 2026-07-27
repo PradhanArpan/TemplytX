@@ -3,7 +3,7 @@
  * Each block renders as an editable element in the author's serif.
  * Equations render live with KaTeX (click to edit, blur to render).
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { RichParagraph } from './RichParagraph';
@@ -77,8 +77,9 @@ export function ParagraphView({ block, onChange, onDelete, onFocusCursor, marker
 export function EquationView({ block, onChange, onDelete }: BlockProps<EquationBlock>) {
   const [draft, setDraft] = useState(block.latex);
   const [focused, setFocused] = useState(false);
+  const [showGreek, setShowGreek] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Live preview of the CURRENT draft (updates as you type).
   let rendered = ''; let renderError = false; let errorMsg = '';
   try {
     rendered = katex.renderToString(draft || '\\;', { displayMode: true, throwOnError: true });
@@ -86,11 +87,30 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
 
   function commit(v: string) { setDraft(v); onChange({ latex: v } as Partial<EquationBlock>); }
 
+  /** Insert a snippet at the cursor; `caret` is where to place the cursor
+   *  after insertion (offset from insertion point). */
+  function insert(snippet: string, caret?: number) {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + snippet + draft.slice(end);
+    commit(next);
+    // restore focus + caret after React updates the value
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + (caret ?? snippet.length);
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  const tBtn = 'text-[12px] px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer font-mono';
+  const GREEK = ['\\alpha','\\beta','\\gamma','\\delta','\\theta','\\lambda','\\mu','\\pi','\\sigma','\\phi','\\omega','\\Delta','\\Sigma','\\Omega','\\nabla','\\partial'];
+
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
         background: 'var(--color-surface)', margin: '6px 0', overflow: 'hidden' }}>
-        {/* live preview */}
         <div style={{ padding: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center',
           minHeight: 48, borderBottom: '1px solid var(--color-border)',
           background: renderError ? 'var(--status-error-bg)' : 'var(--color-bg)' }}>
@@ -98,10 +118,34 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
             ? <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--status-error)' }}>{errorMsg}</span>
             : <span dangerouslySetInnerHTML={{ __html: rendered }} />}
         </div>
-        {/* LaTeX source input */}
+
+        {/* template row — insert LaTeX skeletons without knowing LaTeX */}
+        <div className="flex flex-wrap items-center gap-1 px-3 pt-2" style={{ position: 'relative' }}>
+          <button type="button" className={tBtn} title="Fraction" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\frac{}{}', 6)}>a/b</button>
+          <button type="button" className={tBtn} title="Superscript" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('^{}', 2)}>x²</button>
+          <button type="button" className={tBtn} title="Subscript" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('_{}', 2)}>x₂</button>
+          <button type="button" className={tBtn} title="Square root" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\sqrt{}', 6)}>√</button>
+          <button type="button" className={tBtn} title="Summation" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\sum_{}^{}', 6)}>∑</button>
+          <button type="button" className={tBtn} title="Integral" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\int_{}^{}', 6)}>∫</button>
+          <button type="button" className={tBtn} title="Brackets" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\left( \\right)', 7)}>( )</button>
+          <div style={{ position: 'relative' }}>
+            <button type="button" className={tBtn} title="Greek letters" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowGreek((s) => !s)}>αβγ</button>
+            {showGreek && (
+              <div className="absolute z-30 top-8 left-0 w-[200px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-4 gap-0.5">
+                {GREEK.map((g) => (
+                  <button key={g} type="button" onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { insert(g + ' '); setShowGreek(false); }}
+                    className="text-[13px] p-1 rounded hover:bg-[var(--color-accent-bg)] cursor-pointer border-none bg-transparent"
+                    dangerouslySetInnerHTML={{ __html: (() => { try { return katex.renderToString(g, { throwOnError: false }); } catch { return g; } })() }} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-faint)' }}>ƒx</span>
-          <input value={draft} placeholder="Type LaTeX, e.g. E = mc^2 or \frac{a}{b}"
+          <input ref={inputRef} value={draft} placeholder="Type LaTeX, or use the buttons above"
             onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
             onChange={(e) => commit(e.target.value)}
             style={{ ...bare, fontFamily: 'var(--font-mono)', fontSize: 13, flex: 1 }} />
@@ -112,7 +156,7 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
         </div>
         {focused && (
           <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--color-faint)' }}>
-            Live preview above · supports \frac, \sum, \int, ^, _, Greek (\alpha), etc.
+            Tip: click a button to insert a template, then fill in the blanks. Live preview updates above.
           </div>
         )}
       </div>

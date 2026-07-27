@@ -16,6 +16,7 @@ import { Skeleton } from '../../components/ui/Card';
 import { ReadinessGauge } from '../../components/ui/ReadinessGauge';
 import { BlockView } from './blocks/BlockView';
 import { EditorToolbar } from './EditorToolbar';
+import { RefMenu } from './RefMenu';
 import { FrontMatter } from './FrontMatter';
 import type { Author } from '../../types/document';
 
@@ -296,35 +297,7 @@ export function EditorScreen() {
             el.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }} />
-        {crossRefs.size > 0 && (() => {
-          const entries = [...crossRefs.entries()];
-          const figs = entries.filter(([, l]) => l.startsWith('Fig'));
-          const tabs = entries.filter(([, l]) => l.startsWith('Table'));
-          const eqs = entries.filter(([, l]) => l.startsWith('Eq'));
-          return (
-            <select
-              onChange={(e) => { if (e.target.value) { insertXref(e.target.value); e.target.value = ''; } }}
-              defaultValue=""
-              className="text-[12px] px-2 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer outline-none">
-              <option value="" disabled>Insert \ref</option>
-              {figs.length > 0 && (
-                <optgroup label="Figures">
-                  {figs.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-                </optgroup>
-              )}
-              {tabs.length > 0 && (
-                <optgroup label="Tables">
-                  {tabs.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-                </optgroup>
-              )}
-              {eqs.length > 0 && (
-                <optgroup label="Equations">
-                  {eqs.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-                </optgroup>
-              )}
-            </select>
-          );
-        })()}
+        <RefMenu blocks={blocks} onPick={(refId) => insertXref(refId)} />
       </div>
 
       <div className="grid grid-cols-[210px_1fr_276px] flex-1 min-h-0">
