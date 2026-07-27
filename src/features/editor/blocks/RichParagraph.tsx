@@ -8,7 +8,7 @@
 import { useEffect, useRef } from 'react';
 
 const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
-const REF_RE = /\[\[ref:([a-z0-9-]+)\]\]/gi;
+const REF_RE = /\[\[ref:([a-z0-9:-]+)\]\]/gi;
 
 function tokensToChips(html: string, markers: Map<string, string>, refs: Map<string, string>): string {
   return html

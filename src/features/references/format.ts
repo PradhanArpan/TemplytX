@@ -148,19 +148,60 @@ export function sanitizeInlineHtml(html: string): string {
 // --- cross-references to figures / tables / equations ------------------------
 import { computeNumbering } from '../export/numbering';
 
-export const REF_RE = /\[\[ref:([a-z0-9-]+)\]\]/gi;
+export const REF_RE = /\[\[ref:([a-z0-9:-]+)\]\]/gi;
 
-/** Map of blockId -> in-text label ("Fig. 2", "Table 1", "Eq. (3)"). */
-export function crossRefMap(blocks: DocumentBlock[]): Map<string, string> {
+export interface CrossRef {
+  kind: 'figure' | 'table' | 'equation';
+  number: string;   // "2", "1", "3", or "2a" for a subfigure
+}
+
+/** Map of ref-id -> {kind, number}. Subfigures use id "blockId:subId". */
+export function crossRefData(blocks: DocumentBlock[]): Map<string, CrossRef> {
   const num = computeNumbering(blocks, false);
-  const map = new Map<string, string>();
-  num.figures.forEach((n, id) => map.set(id, `Fig. ${n}`));
-  num.tables.forEach((n, id) => map.set(id, `Table ${n}`));
-  num.equations.forEach((n, id) => map.set(id, `Eq. (${n})`));
+  const map = new Map<string, CrossRef>();
+  num.figures.forEach((n, id) => {
+    map.set(id, { kind: 'figure', number: String(n) });
+    // Subfigures: Fig. Na, Nb, … keyed as "blockId:subId".
+    const blk = blocks.find((b) => b.id === id);
+    if (blk && blk.type === 'figure' && blk.subfigures) {
+      blk.subfigures.forEach((s, i) => {
+        map.set(`${id}:${s.id}`, { kind: 'figure', number: `${n}${String.fromCharCode(97 + i)}` });
+      });
+    }
+  });
+  num.tables.forEach((n, id) => map.set(id, { kind: 'table', number: String(n) }));
+  num.equations.forEach((n, id) => map.set(id, { kind: 'equation', number: String(n) }));
   return map;
 }
 
-/** Replace [[ref:id]] tokens with their label. */
-export function renderCrossRefs(text: string, labels: Map<string, string>): string {
-  return text.replace(REF_RE, (_, id) => labels.get(id) ?? 'Ref. ?');
+/** Short label for the picker/editor chip (always abbreviated). */
+export function crossRefMap(blocks: DocumentBlock[]): Map<string, string> {
+  const data = crossRefData(blocks);
+  const map = new Map<string, string>();
+  data.forEach((d, id) => {
+    const short = d.kind === 'figure' ? `Fig. ${d.number}`
+      : d.kind === 'table' ? `Table ${d.number}` : `Eq. (${d.number})`;
+    map.set(id, short);
+  });
+  return map;
+}
+
+/**
+ * Render [[ref:id]] tokens, choosing long vs short form by sentence position:
+ * at the start of a sentence -> "Figure 2" / "Equation 3" / "Table 1";
+ * mid-sentence -> "Fig. 2" / "Eq. (3)" / "Table 1".
+ * (Tables are conventionally "Table N" in both positions.)
+ */
+export function renderCrossRefs(text: string, data: Map<string, CrossRef>): string {
+  return text.replace(REF_RE, (_m, id, offset: number) => {
+    const d = data.get(id);
+    if (!d) return 'Ref. ?';
+    // Determine if this ref starts a sentence: look back past whitespace/tags
+    // for sentence-ending punctuation or the very start of the text.
+    const before = text.slice(0, offset).replace(/<[^>]*>/g, '').replace(/\s+$/, '');
+    const atStart = before === '' || /[.!?]$/.test(before);
+    if (d.kind === 'figure') return atStart ? `Figure ${d.number}` : `Fig. ${d.number}`;
+    if (d.kind === 'equation') return atStart ? `Equation ${d.number}` : `Eq. (${d.number})`;
+    return `Table ${d.number}`; // Table stays the same
+  });
 }

@@ -11,7 +11,7 @@ import { saveAs } from 'file-saver';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { computeNumbering } from './numbering';
-import { bareMarkerMap, renderCitationsGrouped, orderedReferences, formatEntry, sanitizeInlineHtml, crossRefMap, renderCrossRefs } from '../references/format';
+import { bareMarkerMap, renderCitationsGrouped, orderedReferences, formatEntry, sanitizeInlineHtml, crossRefData, renderCrossRefs } from '../references/format';
 import { listReferencesSync } from '../../services/references';
 
 const lineMap = { single: 240, onehalf: 360, double: 480 };
@@ -54,7 +54,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
   const pool = listReferencesSync();
   const bare = bareMarkerMap(doc.blocks, pool, tpl);
   const numeric = tpl.citationStyle === 'ieee';
-  const xrefs = crossRefMap(doc.blocks);
+  const xrefs = crossRefData(doc.blocks);
   const refList = orderedReferences(doc.blocks, pool, tpl);
 
   const children: (Paragraph | Table)[] = [
