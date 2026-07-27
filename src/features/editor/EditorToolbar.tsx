@@ -29,7 +29,8 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
     onAfter?.();
   }
   function insertSymbol(sym: string) {
-    document.execCommand('insertText', false, sym);
+    // Insert the symbol in italics (math variables are conventionally italic).
+    document.execCommand('insertHTML', false, `<i>${sym}</i>`);
     setShowSymbols(false);
     onAfter?.();
   }

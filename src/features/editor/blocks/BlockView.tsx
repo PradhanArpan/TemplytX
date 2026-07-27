@@ -152,9 +152,10 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
         {subs.length === 0 ? (
           placeholder(block.src ? 'Image' : 'Figure placeholder — image upload comes with the backend')
         ) : (
-          <div className="grid gap-2 p-2" style={{ gridTemplateColumns: `repeat(${block.perRow ?? 2}, 1fr)` }}>
+          <div className="flex flex-wrap gap-2 p-2 justify-center">
             {subs.map((s, i) => (
-              <div key={s.id} className="border border-[var(--color-border)] rounded overflow-hidden">
+              <div key={s.id} className="border border-[var(--color-border)] rounded overflow-hidden"
+                style={{ flex: '0 0 auto', width: `calc((100% - ${((block.perRow ?? 2) - 1) * 8}px) / ${block.perRow ?? 2})` }}>
                 {placeholder(`(${String.fromCharCode(97 + i)})`)}
                 <div className="p-1.5">
                   <input value={s.caption} placeholder={`(${String.fromCharCode(97 + i)}) caption`}

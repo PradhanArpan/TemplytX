@@ -11,7 +11,8 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
       <header className="flex items-center justify-between px-6 h-14 border-b border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0 z-40">
-        <Link to="/" className="flex items-baseline gap-2 text-[var(--color-text)] no-underline">
+        <Link to="/" className="flex items-center gap-2 text-[var(--color-text)] no-underline">
+          <img src="/logo.png" alt="TemplytX" className="h-8 w-8 object-contain" />
           <span className="font-semibold text-lg tracking-tight">
             Templyt<span className="text-[var(--color-accent)]">X</span>
           </span>

@@ -35,6 +35,7 @@ export function AuthScreen() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }} className="w-full max-w-[380px]">
         <div className="text-center mb-6">
+          <img src="/logo.png" alt="TemplytX" className="h-16 w-16 object-contain mx-auto mb-2" />
           <div className="font-semibold text-[26px] tracking-tight">
             Templyt<span className="text-[var(--color-accent)]">X</span>
           </div>

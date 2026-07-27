@@ -4,7 +4,7 @@
  * content — it's included or anonymized at export time per journal rules.
  */
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Star } from 'lucide-react';
+import { Plus, Trash2, Star, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Author } from '../../types/document';
 
 export function FrontMatter({ title, authors, onTitle, onAuthors }: {
@@ -23,6 +23,14 @@ export function FrontMatter({ title, authors, onTitle, onAuthors }: {
     onAuthors(authors.map((a) => (a.id === id ? { ...a, ...p } : a)));
   }
   function remove(id: string) { onAuthors(authors.filter((a) => a.id !== id)); }
+  function move(id: string, dir: -1 | 1) {
+    const i = authors.findIndex((a) => a.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= authors.length) return;
+    const next = [...authors];
+    [next[i], next[j]] = [next[j], next[i]];
+    onAuthors(next);
+  }
   function setCorresponding(id: string) {
     onAuthors(authors.map((a) => ({ ...a, isCorresponding: a.id === id })));
   }
@@ -51,6 +59,16 @@ export function FrontMatter({ title, authors, onTitle, onAuthors }: {
               <input value={a.affiliation} onChange={(e) => patch(a.id, { affiliation: e.target.value })}
                 placeholder="Affiliation"
                 className="flex-1 min-w-0 text-[13px] px-2 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] outline-none focus:border-[var(--color-accent)] text-[var(--color-muted)]" />
+              <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <button onClick={() => move(a.id, -1)} aria-label="Move author up"
+                  className="p-0 text-[var(--color-faint)] hover:text-[var(--color-accent)] cursor-pointer border-none bg-transparent leading-none">
+                  <ChevronUp size={13} />
+                </button>
+                <button onClick={() => move(a.id, 1)} aria-label="Move author down"
+                  className="p-0 text-[var(--color-faint)] hover:text-[var(--color-accent)] cursor-pointer border-none bg-transparent leading-none">
+                  <ChevronDown size={13} />
+                </button>
+              </div>
               <button onClick={() => remove(a.id)} aria-label="Remove author"
                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-[var(--color-faint)] hover:text-[var(--status-error)] cursor-pointer border-none bg-transparent shrink-0">
                 <Trash2 size={13} />

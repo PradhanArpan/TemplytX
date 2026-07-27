@@ -50,10 +50,11 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         let inner: string;
         if (subs.length > 0) {
           const per = b.perRow ?? 2;
-          inner = `<div class="subfigs" style="grid-template-columns:repeat(${per},1fr)">${subs.map((s, i) => {
+          const basis = `calc((100% - ${(per - 1) * 8}pt) / ${per})`;
+          inner = `<div class="subfigs">${subs.map((s, i) => {
             const img = s.src ? `<img src="${esc(s.src)}" alt=""/>` : `<div class="fig-ph">(${String.fromCharCode(97 + i)})</div>`;
             const cap = s.caption ? `<div class="subcap">(${String.fromCharCode(97 + i)}) ${esc(s.caption)}</div>` : '';
-            return `<div class="subfig">${img}${cap}</div>`;
+            return `<div class="subfig" style="flex-basis:${basis}">${img}${cap}</div>`;
           }).join('')}</div>`;
         } else {
           inner = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"/>` : `<div class="fig-ph">[Figure ${n}]</div>`;
@@ -126,8 +127,8 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   figure.fig { margin: 10pt 0; text-align: center; break-inside: avoid; }
   .fig-ph { border: 1px dashed #999; padding: 24pt; color: #777; }
   figure.fig img { max-width: 100%; }
-  .subfigs { display: grid; gap: 8pt; justify-items: center; }
-  .subfig { flex: 1; min-width: 30%; }
+  .subfigs { display: flex; flex-wrap: wrap; gap: 8pt; justify-content: center; }
+  .subfig { flex-grow: 0; flex-shrink: 0; }
   .subfig img { max-width: 100%; }
   .subcap { font-size: ${fmt.bodyFontPt - 2}pt; font-style: italic; margin-top: 2pt; }
   figcaption { font-size: ${fmt.bodyFontPt - 1}pt; margin-top: 4pt; }
