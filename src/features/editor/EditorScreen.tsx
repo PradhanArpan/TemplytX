@@ -58,8 +58,29 @@ export function EditorScreen() {
   const [saved, setSaved] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks which paragraph is focused + a getter for the cursor position.
-  const cursor = useRef<{ blockId: string; get: () => number } | null>(null);
+  // Tracks the last caret position inside a rich paragraph: the block id and
+  // a cloned Range, so we can insert exactly there even after focus moves to
+  // the reference panel (clicking the panel would otherwise lose the caret).
+  const cursor = useRef<{ blockId: string; range: Range } | null>(null);
+
+  // Continuously remember the caret whenever it's inside a rich paragraph.
+  useEffect(() => {
+    function onSelChange() {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const node = sel.anchorNode;
+      const host = (node instanceof Element ? node : node?.parentElement)
+        ?.closest('[data-rich-block]') as HTMLElement | null;
+      if (host) {
+        cursor.current = {
+          blockId: host.getAttribute('data-rich-block')!,
+          range: sel.getRangeAt(0).cloneRange(),
+        };
+      }
+    }
+    document.addEventListener('selectionchange', onSelChange);
+    return () => document.removeEventListener('selectionchange', onSelChange);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -146,57 +167,60 @@ export function EditorScreen() {
   /** Cite a reference: insert [[cite:id]] at the cursor in the focused paragraph. */
   function cite(ref: Reference) {
     const c = cursor.current;
-    if (!c) return; // no paragraph focused
+    if (!c) return; // no paragraph caret remembered
     const target = blocks.find((b) => b.id === c.blockId);
     if (!target || target.type !== 'paragraph') return;
 
     const el = document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null;
-    const sel = window.getSelection();
+    if (!el) return;
 
-    // Predict the marker this citation will get, so the chip shows it
-    // immediately (no "…" placeholder until export). We simulate the block
-    // content with the new token inserted and recompute the marker map.
     const poolWith = pool.some((r) => r.id === ref.id) ? pool : [...pool, ref];
     const chip = document.createElement('span');
     chip.className = 'tx-cite';
     chip.setAttribute('contenteditable', 'false');
     chip.setAttribute('data-cite', ref.id);
 
-    if (el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
-      const range = sel.getRangeAt(0);
+    // Restore the caret to exactly where it was before the panel was clicked.
+    const range = c.range;
+    if (el.contains(range.commonAncestorContainer)) {
       range.deleteContents();
       range.insertNode(chip);
       range.setStartAfter(chip); range.collapse(true);
-      sel.removeAllRanges(); sel.addRange(range);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      cursor.current = { blockId: c.blockId, range: range.cloneRange() };
       const tokenized = tokensFromEl(el);
-      // Recompute markers against the simulated new content + pool.
       const simBlocks = blocks.map((b) => b.id === c.blockId
         ? { ...b, content: tokenized } as DocumentBlock : b);
       const newMarkers = markerMap(simBlocks, poolWith, tpl);
       chip.textContent = newMarkers.get(ref.id) ?? '[?]';
       patchBlock(c.blockId, { content: tokenized } as Partial<DocumentBlock>);
     } else {
-      const cur = target.content;
-      patchBlock(c.blockId, { content: `${cur} [[cite:${ref.id}]]` } as Partial<DocumentBlock>);
+      // Fallback: append if the saved range is somehow stale.
+      patchBlock(c.blockId, { content: `${target.content} [[cite:${ref.id}]]` } as Partial<DocumentBlock>);
     }
     setPool((p) => (p.some((r) => r.id === ref.id) ? p : [...p, ref]));
   }
 
   function insertXref(targetId: string) {
     const c = cursor.current;
-    const el = c ? document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null : null;
-    const sel = window.getSelection();
-    if (c && el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
-      const chip = document.createElement('span');
-      chip.className = 'tx-xref';
-      chip.setAttribute('contenteditable', 'false');
-      chip.setAttribute('data-ref', targetId);
-      chip.textContent = crossRefs.get(targetId) ?? 'Ref. ?';
-      const range = sel.getRangeAt(0);
+    if (!c) return;
+    const el = document.querySelector(`#block-${c.blockId} [contenteditable]`) as HTMLElement | null;
+    if (!el) return;
+    const chip = document.createElement('span');
+    chip.className = 'tx-xref';
+    chip.setAttribute('contenteditable', 'false');
+    chip.setAttribute('data-ref', targetId);
+    chip.textContent = crossRefs.get(targetId) ?? 'Ref. ?';
+
+    const range = c.range;
+    if (el.contains(range.commonAncestorContainer)) {
       range.deleteContents();
       range.insertNode(chip);
       range.setStartAfter(chip); range.collapse(true);
-      sel.removeAllRanges(); sel.addRange(range);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      cursor.current = { blockId: c.blockId, range: range.cloneRange() };
       patchBlock(c.blockId, { content: tokensFromEl(el) } as Partial<DocumentBlock>);
     }
   }
@@ -320,8 +344,7 @@ export function EditorScreen() {
                       markers={markers}
                       crossRefs={crossRefs}
                       onChange={(patch) => patchBlock(b.id, patch)}
-                      onDelete={() => deleteBlock(b.id)}
-                      onFocusCursor={(blockId, get) => { cursor.current = { blockId, get }; }} />
+                      onDelete={() => deleteBlock(b.id)} />
                   </div>
                 </div>
               </div>
