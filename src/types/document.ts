@@ -63,12 +63,13 @@ export interface Subfigure {
 
 export interface FigureBlock extends BaseBlock {
   type: 'figure';
-  src: string; // storage URL (single-image figure; empty when using subfigures)
+  src: string;
   caption: string;
   label?: string;
-  /** Optional multi-image layout; when present, overrides `src`. */
   subfigures?: Subfigure[];
-  centered?: boolean; // default true
+  centered?: boolean;
+  /** How many subfigures per row (default 2). */
+  perRow?: number;
 }
 
 export interface TableBlock extends BaseBlock {
@@ -76,14 +77,16 @@ export interface TableBlock extends BaseBlock {
   rows: string[][];
   caption?: string;
   label?: string;
-  /** Per-column horizontal alignment. Length matches column count. */
   align?: ('left' | 'center' | 'right')[];
-  /** booktabs-style rules. */
-  topRule?: boolean;      // rule above the first row
-  headerRule?: boolean;   // rule under the header row (row 0)
-  bottomRule?: boolean;   // rule below the last row
-  rowLines?: boolean;     // horizontal line between every row (hline)
-  centered?: boolean;     // center the table block
+  topRule?: boolean;
+  headerRule?: boolean;
+  bottomRule?: boolean;
+  rowLines?: boolean;
+  centered?: boolean;
+  /** Vertical lines between columns. */
+  colLines?: boolean;
+  /** Optional per-column width as a percentage (0 = auto). Length = columns. */
+  colWidths?: number[];
 }
 
 export type DocumentBlock =

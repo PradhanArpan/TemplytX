@@ -49,7 +49,8 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         const subs = b.subfigures ?? [];
         let inner: string;
         if (subs.length > 0) {
-          inner = `<div class="subfigs">${subs.map((s, i) => {
+          const per = b.perRow ?? 2;
+          inner = `<div class="subfigs" style="grid-template-columns:repeat(${per},1fr)">${subs.map((s, i) => {
             const img = s.src ? `<img src="${esc(s.src)}" alt=""/>` : `<div class="fig-ph">(${String.fromCharCode(97 + i)})</div>`;
             const cap = s.caption ? `<div class="subcap">(${String.fromCharCode(97 + i)}) ${esc(s.caption)}</div>` : '';
             return `<div class="subfig">${img}${cap}</div>`;
@@ -62,6 +63,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
       case 'table': {
         const n = num.tables.get(b.id);
         const al = b.align ?? [];
+        const w = b.colWidths ?? [];
         const rowCount = b.rows.length;
         const rules = (ri: number) => {
           const s: string[] = [];
@@ -69,13 +71,19 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
           if (ri === 1 && b.headerRule) s.push('border-top:1px solid #000');
           if (ri > 0 && b.rowLines) s.push('border-top:0.5px solid #666');
           if (ri === rowCount - 1 && b.bottomRule) s.push('border-bottom:1.5px solid #000');
-          return s.length ? ` style="${s.join(';')}"` : '';
+          return s;
         };
-        const rows = b.rows.map((r, ri) =>
-          `<tr${rules(ri)}>${r.map((c, ci) => {
-            const ta = al[ci] ? ` style="text-align:${al[ci]}"` : '';
-            return ri === 0 ? `<th${ta}>${esc(c)}</th>` : `<td${ta}>${esc(c)}</td>`;
-          }).join('')}</tr>`).join('');
+        const rows = b.rows.map((r, ri) => {
+          const rowStyle = rules(ri).join(';');
+          return `<tr${rowStyle ? ` style="${rowStyle}"` : ''}>${r.map((c, ci) => {
+            const st: string[] = [];
+            if (al[ci]) st.push(`text-align:${al[ci]}`);
+            if (w[ci] > 0) st.push(`width:${w[ci]}%`);
+            if (b.colLines && ci > 0) st.push('border-left:0.5px solid #666');
+            const style = st.length ? ` style="${st.join(';')}"` : '';
+            return ri === 0 ? `<th${style}>${esc(c)}</th>` : `<td${style}>${esc(c)}</td>`;
+          }).join('')}</tr>`;
+        }).join('');
         const cap = b.caption ? ` ${esc(b.caption)}` : '';
         const centered = b.centered ? ' style="text-align:center"' : '';
         return `<div class="tbl"${centered}><div class="tbl-cap"><strong>Table ${n}.</strong>${cap}</div><table${b.centered ? ' style="margin:0 auto"' : ''}>${rows}</table></div>`;
@@ -118,7 +126,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
   figure.fig { margin: 10pt 0; text-align: center; break-inside: avoid; }
   .fig-ph { border: 1px dashed #999; padding: 24pt; color: #777; }
   figure.fig img { max-width: 100%; }
-  .subfigs { display: flex; flex-wrap: wrap; gap: 8pt; justify-content: center; }
+  .subfigs { display: grid; gap: 8pt; justify-items: center; }
   .subfig { flex: 1; min-width: 30%; }
   .subfig img { max-width: 100%; }
   .subcap { font-size: ${fmt.bodyFontPt - 2}pt; font-style: italic; margin-top: 2pt; }

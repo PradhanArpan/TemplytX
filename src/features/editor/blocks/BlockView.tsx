@@ -134,7 +134,17 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
         borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--color-surface)' }}>
         <div className="flex items-center gap-1 p-2 border-b border-[var(--color-border)]">
           <button className={ctrlBtn} onClick={addSub}>+ Subfigure</button>
-          <span className="text-[10.5px] text-[var(--color-faint)]">
+          {subs.length > 0 && (
+            <label className="flex items-center gap-1 text-[10.5px] text-[var(--color-muted)] ml-1">
+              per row:
+              <select value={block.perRow ?? 2}
+                onChange={(e) => onChange({ perRow: parseInt(e.target.value, 10) } as Partial<FigureBlock>)}
+                className="text-[10.5px] border border-[var(--color-border)] rounded px-1 py-0.5 bg-[var(--color-surface)] cursor-pointer outline-none">
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
+          <span className="text-[10.5px] text-[var(--color-faint)] ml-auto">
             {subs.length > 0 ? `${subs.length} subfigure${subs.length === 1 ? '' : 's'}` : 'single image'}
           </span>
         </div>
@@ -142,9 +152,9 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
         {subs.length === 0 ? (
           placeholder(block.src ? 'Image' : 'Figure placeholder — image upload comes with the backend')
         ) : (
-          <div className="flex flex-wrap gap-2 p-2">
+          <div className="grid gap-2 p-2" style={{ gridTemplateColumns: `repeat(${block.perRow ?? 2}, 1fr)` }}>
             {subs.map((s, i) => (
-              <div key={s.id} className="flex-1 min-w-[120px] border border-[var(--color-border)] rounded overflow-hidden">
+              <div key={s.id} className="border border-[var(--color-border)] rounded overflow-hidden">
                 {placeholder(`(${String.fromCharCode(97 + i)})`)}
                 <div className="p-1.5">
                   <input value={s.caption} placeholder={`(${String.fromCharCode(97 + i)}) caption`}
@@ -173,66 +183,94 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
 export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>) {
   const cols = block.rows[0]?.length ?? 0;
   const align = block.align ?? Array(cols).fill('left');
+  const widths = block.colWidths ?? Array(cols).fill(0);
   const ctrlBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer transition-colors';
   const activeBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-accent)] cursor-pointer';
+  const miniBtn = 'text-[10px] leading-none w-4 h-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer flex items-center justify-center';
 
   function setCell(r: number, c: number, v: string) {
     const rows = block.rows.map((row, ri) => ri === r ? row.map((cell, ci) => (ci === c ? v : cell)) : row);
     onChange({ rows } as Partial<TableBlock>);
   }
-  function addRow() { onChange({ rows: [...block.rows, Array(cols).fill('')] } as Partial<TableBlock>); }
-  function removeRow() { if (block.rows.length > 1) onChange({ rows: block.rows.slice(0, -1) } as Partial<TableBlock>); }
-  function addCol() {
-    onChange({ rows: block.rows.map((row) => [...row, '']), align: [...align, 'left'] } as Partial<TableBlock>);
+  /** Insert a row at index i (i can equal length to append). */
+  function insertRow(i: number) {
+    const rows = [...block.rows];
+    rows.splice(i, 0, Array(cols).fill(''));
+    onChange({ rows } as Partial<TableBlock>);
   }
-  function removeCol() {
-    if (cols > 1) onChange({
-      rows: block.rows.map((row) => row.slice(0, -1)),
-      align: align.slice(0, -1),
+  function deleteRow(i: number) {
+    if (block.rows.length <= 1) return;
+    onChange({ rows: block.rows.filter((_, ri) => ri !== i) } as Partial<TableBlock>);
+  }
+  /** Insert a column at index c. */
+  function insertCol(c: number) {
+    const rows = block.rows.map((row) => { const n = [...row]; n.splice(c, 0, ''); return n; });
+    const a = [...align]; a.splice(c, 0, 'left');
+    const w = [...widths]; w.splice(c, 0, 0);
+    onChange({ rows, align: a, colWidths: w } as Partial<TableBlock>);
+  }
+  function deleteCol(c: number) {
+    if (cols <= 1) return;
+    onChange({
+      rows: block.rows.map((row) => row.filter((_, ci) => ci !== c)),
+      align: align.filter((_, ci) => ci !== c),
+      colWidths: widths.filter((_, ci) => ci !== c),
     } as Partial<TableBlock>);
   }
   function setColAlign(c: number, a: 'left' | 'center' | 'right') {
     const next = [...align]; next[c] = a;
     onChange({ align: next } as Partial<TableBlock>);
   }
+  function setColWidth(c: number, w: number) {
+    const next = [...widths]; next[c] = w;
+    onChange({ colWidths: next } as Partial<TableBlock>);
+  }
   function toggle(key: keyof TableBlock) {
     onChange({ [key]: !block[key] } as Partial<TableBlock>);
   }
 
   const border = '1px solid var(--color-text)';
+  const vline = block.colLines ? '1px solid var(--color-border)' : undefined;
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <div style={{ margin: '8px 0' }}>
-        {/* control bar */}
+        {/* rule + layout toggles */}
         <div className="flex flex-wrap items-center gap-1 mb-2">
-          <button className={ctrlBtn} onClick={addRow}>+ Row</button>
-          <button className={ctrlBtn} onClick={removeRow}>− Row</button>
-          <button className={ctrlBtn} onClick={addCol}>+ Col</button>
-          <button className={ctrlBtn} onClick={removeCol}>− Col</button>
-          <span className="w-px h-4 bg-[var(--color-border)] mx-1" />
           <button className={block.topRule ? activeBtn : ctrlBtn} onClick={() => toggle('topRule')}>top rule</button>
           <button className={block.headerRule ? activeBtn : ctrlBtn} onClick={() => toggle('headerRule')}>header rule</button>
           <button className={block.bottomRule ? activeBtn : ctrlBtn} onClick={() => toggle('bottomRule')}>bottom rule</button>
           <button className={block.rowLines ? activeBtn : ctrlBtn} onClick={() => toggle('rowLines')}>row lines</button>
+          <button className={block.colLines ? activeBtn : ctrlBtn} onClick={() => toggle('colLines')}>col lines</button>
           <button className={block.centered ? activeBtn : ctrlBtn} onClick={() => toggle('centered')}>center</button>
         </div>
 
-        {/* per-column alignment row */}
-        <div className="flex gap-1 mb-1">
+        {/* column header controls: insert-left, delete, align, width, insert-right */}
+        <div className="flex gap-1 mb-1 items-end">
           {Array.from({ length: cols }).map((_, c) => (
-            <div key={c} className="flex-1 flex justify-center gap-0.5">
-              {(['left', 'center', 'right'] as const).map((a) => (
-                <button key={a} onClick={() => setColAlign(c, a)} title={`Align ${a}`}
-                  className={`text-[10px] px-1 rounded cursor-pointer border ${align[c] === a ? 'border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-transparent text-[var(--color-faint)]'}`}>
-                  {a === 'left' ? '⌷◁' : a === 'center' ? '▷◁' : '▷⌷'}
-                </button>
-              ))}
+            <div key={c} className="flex-1 flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-0.5">
+                <button className={miniBtn} title="Insert column left" onClick={() => insertCol(c)}>+</button>
+                <button className={miniBtn} title="Delete column" onClick={() => deleteCol(c)}>×</button>
+                {c === cols - 1 && <button className={miniBtn} title="Insert column right" onClick={() => insertCol(c + 1)}>+</button>}
+              </div>
+              <div className="flex gap-0.5">
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <button key={a} onClick={() => setColAlign(c, a)} title={`Align ${a}`}
+                    className={`text-[9px] px-1 rounded cursor-pointer border ${align[c] === a ? 'border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-transparent text-[var(--color-faint)]'}`}>
+                    {a[0].toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <input type="number" min={0} max={100} value={widths[c] || ''} placeholder="auto"
+                onChange={(e) => setColWidth(c, parseInt(e.target.value, 10) || 0)}
+                title="Column width %"
+                className="w-12 text-[9px] px-1 py-0.5 border border-[var(--color-border)] rounded text-center bg-[var(--color-surface)] outline-none" />
             </div>
           ))}
         </div>
 
         <table style={{ borderCollapse: 'collapse', width: '100%',
-          margin: block.centered ? '0 auto' : undefined }}>
+          margin: block.centered ? '0 auto' : undefined, tableLayout: widths.some((w) => w > 0) ? 'fixed' : 'auto' }}>
           <tbody>
             {block.rows.map((row, r) => (
               <tr key={r} style={{
@@ -241,8 +279,17 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
                   : (r > 0 && block.rowLines) ? '1px solid var(--color-border)' : undefined,
                 borderBottom: (r === block.rows.length - 1 && block.bottomRule) ? border : undefined,
               }}>
+                {/* row controls in a leading mini-cell */}
+                <td style={{ padding: 0, width: 18, verticalAlign: 'middle' }}>
+                  <div className="flex flex-col gap-0.5">
+                    <button className={miniBtn} title="Insert row above" onClick={() => insertRow(r)}>+</button>
+                    <button className={miniBtn} title="Delete row" onClick={() => deleteRow(r)}>×</button>
+                    {r === block.rows.length - 1 && <button className={miniBtn} title="Insert row below" onClick={() => insertRow(r + 1)}>+</button>}
+                  </div>
+                </td>
                 {row.map((cell, c) => (
-                  <td key={c} style={{ padding: 0 }}>
+                  <td key={c} style={{ padding: 0, borderLeft: c > 0 ? vline : undefined,
+                    width: widths[c] > 0 ? `${widths[c]}%` : undefined }}>
                     <input value={cell} onChange={(e) => setCell(r, c, e.target.value)}
                       style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 14,
                         padding: '6px 9px', fontWeight: r === 0 ? 600 : 400,
