@@ -53,6 +53,45 @@ export function markerMap(
   return map;
 }
 
+/** "Bare" marker (no brackets/parens) per id, for grouping adjacent cites. */
+export function bareMarkerMap(
+  blocks: DocumentBlock[], pool: Reference[], tpl: Template | null,
+): Map<string, string> {
+  const ordered = orderedReferences(blocks, pool, tpl);
+  const map = new Map<string, string>();
+  const numeric = tpl?.citationStyle === 'ieee';
+  ordered.forEach((r, i) => {
+    if (numeric) map.set(r.id, String(i + 1));
+    else {
+      const first = r.authors[0]?.split(',')[0] ?? 'Ref';
+      map.set(r.id, `${first}, ${r.year ?? 'n.d.'}`);
+    }
+  });
+  return map;
+}
+
+/**
+ * Render citations, MERGING runs of adjacent [[cite:id]] tokens into one
+ * grouped marker: APA -> (A, 2025; B, 2013); IEEE -> [1, 2, 3]. Non-adjacent
+ * citations stay separate.
+ */
+export function renderCitationsGrouped(
+  text: string, bare: Map<string, string>, numeric: boolean,
+): string {
+  // Match a run of one-or-more citation tokens allowing only whitespace
+  // between them (so "cited together" merges, but tokens with words between
+  // them do not).
+  const RUN = /(?:\[\[cite:[a-z0-9-]+\]\]\s*)+/gi;
+  return text.replace(RUN, (run) => {
+    const ids = [...run.matchAll(CITE_RE)].map((m) => m[1]);
+    const parts = ids.map((id) => bare.get(id) ?? '?');
+    const open = numeric ? '[' : '(';
+    const close = numeric ? ']' : ')';
+    const sep = numeric ? ', ' : '; ';
+    return `${open}${parts.join(sep)}${close}`;
+  });
+}
+
 export function renderCitations(text: string, markers: Map<string, string>): string {
   return text.replace(CITE_RE, (_, id) => markers.get(id) ?? '[?]');
 }

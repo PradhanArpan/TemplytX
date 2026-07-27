@@ -19,6 +19,15 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
     document.execCommand(cmd, false);
     onAfter?.();
   }
+  /** Super/subscript need explicit toggle handling: execCommand toggles the
+   *  format, but applying sup while sub is active can leave both — so clear
+   *  the opposite first, then toggle the requested one. */
+  function runScript(which: 'superscript' | 'subscript') {
+    const other = which === 'superscript' ? 'subscript' : 'superscript';
+    if (document.queryCommandState(other)) document.execCommand(other, false); // turn opposite off
+    document.execCommand(which, false); // toggles requested on/off
+    onAfter?.();
+  }
   function insertSymbol(sym: string) {
     document.execCommand('insertText', false, sym);
     setShowSymbols(false);
@@ -33,8 +42,8 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
       {/* onMouseDown + preventDefault keeps the editor selection alive */}
       <button type="button" onMouseDown={(e) => { e.preventDefault(); run('bold'); }} className={btn} title="Bold (Ctrl+B)"><Bold size={15} /></button>
       <button type="button" onMouseDown={(e) => { e.preventDefault(); run('italic'); }} className={btn} title="Italic (Ctrl+I)"><Italic size={15} /></button>
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); run('superscript'); }} className={btn} title="Superscript"><Superscript size={15} /></button>
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); run('subscript'); }} className={btn} title="Subscript"><Subscript size={15} /></button>
+      <button type="button" onMouseDown={(e) => { e.preventDefault(); runScript('superscript'); }} className={btn} title="Superscript (toggle)"><Superscript size={15} /></button>
+      <button type="button" onMouseDown={(e) => { e.preventDefault(); runScript('subscript'); }} className={btn} title="Subscript (toggle)"><Subscript size={15} /></button>
       <div className="relative">
         <button type="button" onMouseDown={(e) => { e.preventDefault(); setShowSymbols((s) => !s); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
         {showSymbols && (
