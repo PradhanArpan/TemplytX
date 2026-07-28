@@ -126,7 +126,7 @@ export function ReferencePanel({ documentId, onCite, refreshKey }: {
             )}
             {err && <div className="text-[11px] text-[var(--status-error)] mb-2">{err}</div>}
             <button onClick={submit} disabled={busy}
-              className="w-full text-[12px] py-1.5 rounded-[var(--radius)] bg-[var(--color-accent)] text-white border-none cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
+              className="w-full text-[12px] py-1.5 rounded-[var(--radius)] bg-[var(--color-primary-solid)] text-white border-none cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
               {busy ? <><Loader2 size={12} className="animate-spin" /> Fetching…</> : 'Add to document'}
             </button>
           </motion.div>

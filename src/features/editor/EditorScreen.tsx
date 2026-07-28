@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical, PanelLeft, PanelRight, X } from 'lucide-react';
 import { getDocument, updateDocument, listTemplates } from '../../services/documents';
 import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
@@ -60,6 +60,7 @@ export function EditorScreen() {
   const [stale, setStale] = useState(false);
   const [saved, setSaved] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<'left' | 'right' | null>(null);
   const [refKey, setRefKey] = useState(0); // bump to refresh the left ref panel
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks the last caret position inside a rich paragraph: the block id and
@@ -248,14 +249,15 @@ export function EditorScreen() {
   function goToBlock(blockId?: string) {
     if (!blockId) return;
     document.getElementById(`block-${blockId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setPanel(null);
   }
 
   if (!doc) {
     return (
-      <div className="grid grid-cols-[210px_1fr_276px] h-[calc(100vh-56px)]">
-        <div className="border-r border-[var(--color-border)] p-5"><Skeleton className="h-5 w-24 mb-4" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-3/4" /></div>
-        <div className="p-10"><Skeleton className="h-7 w-2/3 mb-6" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></div>
-        <div className="border-l border-[var(--color-border)] p-5 flex flex-col items-center"><Skeleton className="h-28 w-28 rounded-full mb-4" /><Skeleton className="h-9 w-full" /></div>
+      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[210px_1fr_276px] h-[calc(100dvh-56px)]">
+        <div className="hidden min-[1200px]:block border-r border-[var(--color-border)] p-5"><Skeleton className="h-5 w-24 mb-4" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-3/4" /></div>
+        <div className="p-6 sm:p-10"><Skeleton className="h-7 w-2/3 mb-6" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></div>
+        <div className="hidden min-[1200px]:flex border-l border-[var(--color-border)] p-5 flex-col items-center"><Skeleton className="h-28 w-28 rounded-full mb-4" /><Skeleton className="h-9 w-full" /></div>
       </div>
     );
   }
@@ -267,18 +269,18 @@ export function EditorScreen() {
   const refList = orderedReferences(blocks, pool, tpl);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)]">
+    <div className="flex flex-col h-[calc(100dvh-56px)] min-h-0 overflow-hidden">
       {/* toolbar */}
-      <div className="flex items-center justify-between px-6 h-[52px] border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-6 h-[52px] shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="flex flex-1 items-center gap-2 sm:gap-3 min-w-0">
           <button onClick={() => navigate('/')} aria-label="Back to documents"
             className="p-1.5 rounded-[var(--radius)] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors border-none bg-transparent">
             <ArrowLeft size={17} />
           </button>
           <span className="tx-document text-[18px] font-medium truncate">{docTitle || "Untitled"}</span>
-          {tpl && <Badge tone="accent">{tpl.name}</Badge>}
+          {tpl && <span className="hidden lg:inline-flex"><Badge tone="accent">{tpl.name}</Badge></span>}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <AnimatePresence mode="wait">
             <motion.span key={saved ? 'saved' : 'saving'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }} className="text-[12px] text-[var(--color-faint)]">
@@ -290,7 +292,7 @@ export function EditorScreen() {
       </div>
 
       {/* Shared formatting toolbar (Word-like) — acts on the focused block. */}
-      <div className="flex items-center gap-2 px-6 h-[44px] border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+      <div className="flex items-center gap-2 px-3 sm:px-6 h-[44px] shrink-0 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-bg)]">
         <EditorToolbar onAfter={() => {
           const el = document.activeElement as HTMLElement | null;
           if (el && el.getAttribute('contenteditable') === 'true') {
@@ -298,11 +300,37 @@ export function EditorScreen() {
           }
         }} />
         <RefMenu blocks={blocks} onPick={(refId) => insertXref(refId)} />
+        <div className="flex items-center gap-1 ml-auto min-[1200px]:hidden">
+          <button type="button" onClick={() => setPanel('left')} aria-label="Open outline and references"
+            className="flex items-center gap-1.5 whitespace-nowrap text-[12px] px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer">
+            <PanelLeft size={14} /><span className="hidden sm:inline">Outline</span>
+          </button>
+          <button type="button" onClick={() => setPanel('right')} aria-label="Open readiness and labels"
+            className="flex items-center gap-1.5 whitespace-nowrap text-[12px] px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer">
+            <PanelRight size={14} /><span className="hidden sm:inline">Readiness</span>
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-[210px_1fr_276px] flex-1 min-h-0">
+      {panel && (
+        <button type="button" aria-label="Close editor panel" onClick={() => setPanel(null)}
+          className="fixed inset-x-0 top-14 bottom-0 z-40 bg-black/30 border-none min-[1200px]:hidden" />
+      )}
+
+      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[210px_1fr_276px] flex-1 min-h-0 min-w-0">
         {/* left: outline + reference pool */}
-        <aside className="border-r border-[var(--color-border)] px-4 py-5 overflow-y-auto">
+        <aside className={`border-r border-[var(--color-border)] px-4 py-5 overflow-y-auto bg-[var(--color-bg)]
+          min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0
+          max-[1200px]:fixed max-[1200px]:top-14 max-[1200px]:bottom-0 max-[1200px]:left-0 max-[1200px]:z-50
+          max-[1200px]:w-[min(320px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200
+          ${panel === 'left' ? 'max-[1200px]:translate-x-0' : 'max-[1200px]:-translate-x-full'}`}>
+          <div className="flex items-center justify-between mb-4 min-[1200px]:hidden">
+            <span className="font-medium">Document tools</span>
+            <button type="button" onClick={() => setPanel(null)} aria-label="Close outline and references"
+              className="p-2 rounded-[var(--radius)] text-[var(--color-muted)] border-none bg-transparent cursor-pointer">
+              <X size={17} />
+            </button>
+          </div>
           <div className={paneLabel}>Outline</div>
           <div className="flex flex-col gap-0.5">
             {sections.length === 0 && <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>}
@@ -313,11 +341,11 @@ export function EditorScreen() {
               </button>
             ))}
           </div>
-          <ReferencePanel documentId={id!} onCite={cite} refreshKey={refKey} />
+          <ReferencePanel documentId={id!} onCite={(ref) => { cite(ref); setPanel(null); }} refreshKey={refKey} />
         </aside>
 
         {/* center: writing surface with reorder + insert */}
-        <section className="overflow-y-auto px-10 py-8 bg-[var(--color-bg)]">
+        <section className="min-w-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 min-[1200px]:px-10 py-6 sm:py-8 bg-[var(--color-bg)]">
           <div className="max-w-[640px] mx-auto">
             <FrontMatter title={docTitle} authors={authors}
               onTitle={saveTitle} onAuthors={saveAuthors} />
@@ -368,7 +396,18 @@ export function EditorScreen() {
         </section>
 
         {/* right: readiness */}
-        <aside className="border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface)] overflow-y-auto">
+        <aside className={`border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface)] overflow-y-auto
+          min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0
+          max-[1200px]:fixed max-[1200px]:top-14 max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:z-50
+          max-[1200px]:w-[min(340px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200
+          ${panel === 'right' ? 'max-[1200px]:translate-x-0' : 'max-[1200px]:translate-x-full'}`}>
+          <div className="flex items-center justify-between mb-4 min-[1200px]:hidden">
+            <span className="font-medium">Readiness and labels</span>
+            <button type="button" onClick={() => setPanel(null)} aria-label="Close readiness and labels"
+              className="p-2 rounded-[var(--radius)] text-[var(--color-muted)] border-none bg-transparent cursor-pointer">
+              <X size={17} />
+            </button>
+          </div>
           <div className={paneLabel}>Readiness</div>
           <div className="flex flex-col items-center gap-3">
             <ReadinessGauge score={score} stale={stale && score !== null} />

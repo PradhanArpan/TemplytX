@@ -26,19 +26,19 @@ export function TargetMenu({ templates, value, onChange }: {
 
   const selected = templates.find((t) => t.id === value);
 
-  const colCls = 'min-w-[190px] max-h-[300px] overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] py-1';
+  const colCls = 'w-full sm:w-auto sm:min-w-[190px] max-h-[300px] overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] py-1';
   const itemCls = 'w-full text-left text-[13px] px-3 py-2 cursor-pointer border-none bg-transparent text-[var(--color-text)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] flex items-center justify-between gap-2';
 
   return (
-    <div className="relative mb-2" onMouseLeave={() => { setOpen(false); setCat(null); }}>
+    <div className="relative mb-2 min-w-0" onMouseLeave={() => { setOpen(false); setCat(null); }}>
       <button type="button" onClick={() => setOpen((v) => !v)}
         className="w-full text-left text-[14px] px-3 py-2 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center justify-between">
-        <span>{selected ? selected.name : 'Choose a target…'}</span>
+        <span className="min-w-0 truncate">{selected ? selected.name : 'Choose a target…'}</span>
         <span className="text-[var(--color-faint)]">▾</span>
       </button>
 
       {open && (
-        <div className="absolute z-40 top-11 left-0 flex items-start gap-1">
+        <div className="absolute z-40 top-11 left-0 right-0 sm:right-auto flex flex-col sm:flex-row items-stretch sm:items-start gap-1">
           <div className={colCls}>
             {cats.map((c) => (
               <button key={c.type} className={itemCls} onMouseEnter={() => setCat(c.type)}>

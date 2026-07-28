@@ -1,4 +1,5 @@
 import { TargetMenu } from './TargetMenu';
+import { ChristThesisForm, emptyChristMeta } from './ChristThesisForm';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -30,6 +31,7 @@ export function ExportScreen() {
   const [fmt, setFmt] = useState('pdf');
   const [latexMode, setLatexMode] = useState<'submission' | 'cameraready'>('submission');
   const [customClass, setCustomClass] = useState('');
+  const [christMeta, setChristMeta] = useState(emptyChristMeta());
   const [includeAuthors, setIncludeAuthors] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -43,6 +45,7 @@ export function ExportScreen() {
   }, [id]);
 
   const tpl = templates.find((t) => t.id === targetId) ?? null;
+  const isChristThesis = tpl?.id === 'tpl-christ-thesis';
 
   // Live compliance against the CHOSEN export target (not the doc's stored one).
   const report = doc && tpl ? runCompliance({
@@ -67,8 +70,14 @@ export function ExportScreen() {
         await exportDocx(docForExport, tpl);
       } else if (fmt === 'latex-src') {
         // Download the .tex source.
-        const { buildLatex } = await import('./exportLatex');
-        const tex = buildLatex(docForExport, tpl, latexMode, customClass);
+        let tex: string;
+        if (isChristThesis) {
+          const { buildChristThesis } = await import('./exportChristThesis');
+          tex = buildChristThesis({ ...docForExport, christThesis: christMeta });
+        } else {
+          const { buildLatex } = await import('./exportLatex');
+          tex = buildLatex(docForExport, tpl, latexMode, customClass);
+        }
         const blob = new Blob([tex], { type: 'text/x-tex' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -76,8 +85,14 @@ export function ExportScreen() {
         a.click(); URL.revokeObjectURL(url);
       } else if (fmt === 'latex-pdf') {
         // Send .tex to the local LaTeX server and open the compiled PDF.
-        const { buildLatex } = await import('./exportLatex');
-        const tex = buildLatex(docForExport, tpl, latexMode, customClass);
+        let tex: string;
+        if (isChristThesis) {
+          const { buildChristThesis } = await import('./exportChristThesis');
+          tex = buildChristThesis({ ...docForExport, christThesis: christMeta });
+        } else {
+          const { buildLatex } = await import('./exportLatex');
+          tex = buildLatex(docForExport, tpl, latexMode, customClass);
+        }
         try {
           const res = await fetch(`${LATEX_SERVER}/compile`, {
             method: 'POST',
@@ -187,7 +202,11 @@ export function ExportScreen() {
         </div>
       )}
 
-      {(fmt === 'latex-pdf' || fmt === 'latex-src') && (
+      {isChristThesis && (fmt === 'latex-pdf' || fmt === 'latex-src') && (
+        <ChristThesisForm meta={christMeta} onChange={setChristMeta} />
+      )}
+
+      {(fmt === 'latex-pdf' || fmt === 'latex-src') && !isChristThesis && (
         <div className="mb-3">
           <div className="text-[12px] font-medium text-[var(--color-muted)] mb-1.5">LaTeX output mode</div>
           <div className="flex gap-2">

@@ -16,8 +16,8 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--color-accent)] text-white border border-[var(--color-accent)] ' +
-    'hover:bg-[var(--color-accent-hover)] hover:border-[var(--color-accent-hover)] ' +
+    'bg-[var(--color-primary-solid)] text-white border border-[var(--color-primary-solid)] ' +
+    'hover:bg-[var(--color-primary-solid-hover)] hover:border-[var(--color-primary-solid-hover)] ' +
     'shadow-[var(--shadow-card)]',
   secondary:
     'bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border-strong)] ' +

@@ -23,12 +23,14 @@
 
   --color-text:   #1A1A19;
   --color-muted:  #6B6A66;
-  --color-faint:  #9A9A96;
+  --color-faint:  #74736E;
 
   --color-accent:       #185FA5;
   --color-accent-hover: #124A82;
   --color-accent-bg:    #E6F1FB;
   --color-accent-text:  #0C447C;
+  --color-primary-solid:       #185FA5;
+  --color-primary-solid-hover: #124A82;
 
   --status-ready:       #0F6E56;
   --status-ready-bg:    #E1F5EE;
@@ -65,12 +67,14 @@
 
   --color-text:  #ECECEA;
   --color-muted: #A0A09B;
-  --color-faint: #6E6E6A;
+  --color-faint: #858580;
 
   --color-accent:       #6BA6E8;
   --color-accent-hover: #85B7EB;
   --color-accent-bg:    #16324F;
   --color-accent-text:  #B5D4F4;
+  --color-primary-solid:       #2A6FB0;
+  --color-primary-solid-hover: #235F98;
 
   --status-ready:      #5DCAA5;
   --status-ready-bg:   #0C3A2E;
@@ -136,6 +140,10 @@ a { color: var(--color-accent); text-decoration: none; }
   line-height: 1.7;
 }
 .tx-rich { text-align: justify; }
+
+@media (max-width: 767px) {
+  .tx-rich { text-align: left; }
+}
 
 /* Citation chips: inline, non-editable markers rendered from [[cite:id]]. */
 .tx-cite {

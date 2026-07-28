@@ -71,7 +71,7 @@ export function LabelsPanel({ documentId, onPulled }: {
             onKeyDown={(e) => { if (e.key === 'Enter') addLabel(); }}
             placeholder="Label name (e.g. NRW)"
             className="flex-1 text-[12px] px-2 py-1 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] outline-none focus:border-[var(--color-accent)]" />
-          <button onClick={addLabel} className="text-[11px] px-2 rounded-[var(--radius)] bg-[var(--color-accent)] text-white border-none cursor-pointer">Add</button>
+          <button onClick={addLabel} className="text-[11px] px-2 rounded-[var(--radius)] bg-[var(--color-primary-solid)] text-white border-none cursor-pointer">Add</button>
         </div>
       )}
       {err && <div className="text-[11px] text-[var(--status-error)] mb-2">{err}</div>}

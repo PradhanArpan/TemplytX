@@ -158,6 +158,20 @@ export const templateCatalog: Template[] = [
     ],
     isActive: true,
   },
+  {
+    id: 'tpl-christ-thesis', name: 'CHRIST SoET Thesis', publisher: 'CHRIST (Deemed to be University)', type: 'thesis',
+    scope: 'admin-global', citationStyle: 'ieee',
+    citationOrder: 'sequence',
+    sections: [
+      S('Introduction'), S('Research Methodology'), S('Literature Survey'),
+      S('Actual Work'), S('Results, Discussions and Conclusions'),
+    ],
+    formatting: { paperSize: 'a4', columns: 1, lineSpacing: 'onehalf', bodyFont: 'Times New Roman', bodyFontPt: 12, numberSections: true },
+    rules: [
+      { ruleId: 'required-sections', severity: 'warning' },
+    ],
+    isActive: true,
+  },
 ];
 
 /** Required section titles for a template — fed to the required-sections rule. */
