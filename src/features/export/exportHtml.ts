@@ -57,7 +57,8 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
             return `<div class="subfig" style="flex-basis:${basis}">${img}${cap}</div>`;
           }).join('')}</div>`;
         } else {
-          inner = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"/>` : `<div class="fig-ph">[Figure ${n}]</div>`;
+          const w = b.width && b.width < 100 ? ` style="width:${b.width}%"` : '';
+          inner = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"${w}/>` : `<div class="fig-ph">[Figure ${n}]</div>`;
         }
         return `<figure class="fig">${inner}<figcaption><strong>Figure ${n}.</strong> ${esc(b.caption)}</figcaption></figure>`;
       }

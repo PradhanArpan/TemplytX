@@ -70,6 +70,8 @@ export interface FigureBlock extends BaseBlock {
   centered?: boolean;
   /** How many subfigures per row (default 2). */
   perRow?: number;
+  /** Display width as a percentage of the content column (default 100). */
+  width?: number;
 }
 
 export interface TableBlock extends BaseBlock {

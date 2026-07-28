@@ -197,13 +197,20 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
               </select>
             </label>
           )}
+          <label className="flex items-center gap-1 text-[10.5px] text-[var(--color-muted)] ml-1">
+            width:
+            <input type="range" min={20} max={100} step={5} value={block.width ?? 100}
+              onChange={(e) => onChange({ width: parseInt(e.target.value, 10) } as Partial<FigureBlock>)}
+              className="w-20 cursor-pointer" />
+            <span className="w-8 tabular-nums">{block.width ?? 100}%</span>
+          </label>
           <span className="text-[10.5px] text-[var(--color-faint)] ml-auto">
             {subs.length > 0 ? `${subs.length} subfigure${subs.length === 1 ? '' : 's'}` : 'single image'}
           </span>
         </div>
 
         {subs.length === 0 ? (
-          <div className="p-2">
+          <div className="p-2" style={{ width: `${block.width ?? 100}%`, margin: '0 auto' }}>
             <ImageInput src={block.src} onChange={(url) => onChange({ src: url } as Partial<FigureBlock>)} />
           </div>
         ) : (
