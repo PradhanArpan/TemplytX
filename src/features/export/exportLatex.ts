@@ -131,7 +131,30 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template): string {
     else if (b.type === 'equation') { refLabels.set(b.id, `eq:${b.id.slice(0, 8)}`); refKind.set(b.id, 'equation'); }
   });
 
+  const isIEEE = tpl.citationStyle === 'ieee' || /ieee/i.test(tpl.name);
+
+  // For IEEE, the abstract is an environment placed after \maketitle, not a
+  // numbered section. Detect an "Abstract" section and the paragraph(s) that
+  // follow it (until the next section) so we can lift them into \begin{abstract}.
+  let abstractTex = '';
+  const abstractBlockIds = new Set<string>();
+  if (isIEEE) {
+    const idx = doc.blocks.findIndex((b) => b.type === 'section' && /^abstract$/i.test((b as { title: string }).title.trim()));
+    if (idx !== -1) {
+      abstractBlockIds.add(doc.blocks[idx].id);
+      const parts: string[] = [];
+      for (let i = idx + 1; i < doc.blocks.length; i++) {
+        const nb = doc.blocks[i];
+        if (nb.type === 'section') break;
+        abstractBlockIds.add(nb.id);
+        if (nb.type === 'paragraph') parts.push(richToLatex(nb.content, keyMap, refLabels, refKind));
+      }
+      abstractTex = parts.join(' ');
+    }
+  }
+
   const body = doc.blocks.map((b) => {
+    if (abstractBlockIds.has(b.id)) return ''; // handled in the abstract env
     switch (b.type) {
       case 'section': {
         // Abstract is special: unnumbered, conventionally set apart.
@@ -186,9 +209,9 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template): string {
       }
       default: return '';
     }
-  }).join('\n\n');
+  }).filter(Boolean).join('\n\n');
 
-  // Authors
+  // Authors (article-class default; IEEE uses its own block below).
   const authorTex = doc.authors.length
     ? doc.authors.map((a) => texEscape(a.name)).join(' \\and ')
     : 'Anonymous';
@@ -209,17 +232,41 @@ ${refList.map((r) => {
   const usesSubfig = doc.blocks.some((b) => b.type === 'figure' && (b.subfigures?.length ?? 0) > 0);
   const usesGraphics = doc.blocks.some((b) => b.type === 'figure');
   const usesBooktabs = doc.blocks.some((b) => b.type === 'table' && (b.topRule || b.bottomRule || b.headerRule));
+  const pkgs = [
+    '\\usepackage[T1]{fontenc}',
+    '\\usepackage{textcomp}',
+    '\\usepackage{amsmath,amssymb}',
+    usesGraphics ? '\\usepackage{graphicx}' : '',
+    usesSubfig ? '\\usepackage{subcaption}' : '',
+    usesBooktabs ? '\\usepackage{booktabs}' : '',
+    '\\usepackage{cite}',
+  ].filter(Boolean).join('\n');
 
+  if (isIEEE) {
+    // IEEE two-column conference style with proper author blocks + abstract env.
+    const authorBlock = doc.authors.length
+      ? doc.authors.map((a) =>
+          `\\IEEEauthorblockN{${texEscape(a.name)}}${a.affiliation ? `\n\\IEEEauthorblockA{${texEscape(a.affiliation)}}` : ''}`
+        ).join('\n\\and\n')
+      : '\\IEEEauthorblockN{Anonymous}';
+    const abstractEnv = abstractTex ? `\\begin{abstract}\n${abstractTex}\n\\end{abstract}\n` : '';
+    return `\\documentclass[conference]{IEEEtran}
+\\usepackage[utf8]{inputenc}
+${pkgs}
+\\title{${texEscape(doc.title || 'Untitled')}}
+\\author{${authorBlock}}
+\\begin{document}
+\\maketitle
+${abstractEnv}${body}
+${bib}
+\\end{document}`;
+  }
+
+  // Default: article class.
   return `\\documentclass[11pt]{article}
 \\usepackage[utf8]{inputenc}
-\\usepackage[T1]{fontenc}
-\\usepackage{textcomp}
 \\usepackage[margin=1in]{geometry}
-\\usepackage{amsmath,amssymb}
-${usesGraphics ? '\\usepackage{graphicx}' : ''}
-${usesSubfig ? '\\usepackage{subcaption}' : ''}
-${usesBooktabs ? '\\usepackage{booktabs}' : ''}
-\\usepackage{cite}
+${pkgs}
 \\title{${texEscape(doc.title || 'Untitled')}}
 \\author{${authorTex}}
 \\date{\\today}
