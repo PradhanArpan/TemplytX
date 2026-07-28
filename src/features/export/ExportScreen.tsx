@@ -1,3 +1,4 @@
+import { TargetMenu } from './TargetMenu';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -108,9 +109,7 @@ export function ExportScreen() {
     );
   }
 
-  const inputCls =
-    'w-full text-[14px] px-3 py-2.5 border border-[var(--color-border-strong)] rounded-[var(--radius)] ' +
-    'bg-[var(--color-surface)] text-[var(--color-text)] outline-none focus:border-[var(--color-accent)]';
+
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -127,16 +126,7 @@ export function ExportScreen() {
       <div className="text-[13px] text-[var(--color-faint)] uppercase tracking-[0.06em] font-semibold mb-2">
         Target format
       </div>
-      <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={`${inputCls} mb-2`}>
-        {(['journal', 'thesis', 'report', 'proposal', 'lab-report', 'cv'] as const).map((type) => {
-          const group = templates.filter((t) => t.type === type);
-          if (group.length === 0) return null;
-          const label = { journal: 'Journals', thesis: 'Thesis', report: 'Reports', proposal: 'Proposals', 'lab-report': 'Lab Reports', cv: 'Academic CV' }[type];
-          return <optgroup key={type} label={label}>
-            {group.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </optgroup>;
-        })}
-      </select>
+      <TargetMenu templates={templates} value={targetId} onChange={setTargetId} />
 
       {/* compliance against the chosen target */}
       <Card className="p-4 flex items-center gap-4 mb-6">

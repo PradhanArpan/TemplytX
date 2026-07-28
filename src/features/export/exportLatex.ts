@@ -160,6 +160,10 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
     }
   }
 
+  // Whether the output is two-column (so wide floats need starred envs).
+  const twoCol = (family === 'ieee' && mode === 'cameraready')
+    || (family === 'elsevier' && mode === 'cameraready');
+
   const body = doc.blocks.map((b) => {
     if (abstractBlockIds.has(b.id)) return ''; // handled in the abstract env
     switch (b.type) {
@@ -191,7 +195,9 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
             const slbl = refLabels.get(`${b.id}:${s.id}`);
             return `  \\begin{subfigure}{${wv}\\textwidth}\n    \\centering\n    ${localImg(s.src, '\\linewidth')}\n    \\caption{${texEscape(s.caption || '')}}\\label{${slbl}}\n  \\end{subfigure}`;
           }).join('\n  \\hfill\n');
-          return `\\begin{figure}[htbp]\n  \\centering\n${subs}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{figure}`;
+          // Multi-image figures span both columns in two-column layouts.
+          const env = twoCol ? 'figure*' : 'figure';
+          return `\\begin{${env}}[htbp]\n  \\centering\n${subs}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{${env}}`;
         }
         const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
         return `\\begin{figure}[htbp]\n  \\centering\n  ${localImg(b.src, `${width}\\linewidth`)}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{figure}`;
@@ -212,7 +218,9 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
         }).join('\n');
         const top = b.topRule ? '    \\toprule\n' : '';
         const bottom = b.bottomRule ? '\n    \\bottomrule' : '';
-        return `\\begin{table}[htbp]\n  \\centering\n  \\caption{${cap}}\\label{${lbl}}\n  \\begin{tabular}{${colspec}}\n${top}${rowsTex}${bottom}\n  \\end{tabular}\n\\end{table}`;
+        // Tables with several columns span both columns in two-column layouts.
+        const env = (twoCol && cols >= 3) ? 'table*' : 'table';
+        return `\\begin{${env}}[htbp]\n  \\centering\n  \\caption{${cap}}\\label{${lbl}}\n  \\begin{tabular}{${colspec}}\n${top}${rowsTex}${bottom}\n  \\end{tabular}\n\\end{${env}}`;
       }
       default: return '';
     }
@@ -239,6 +247,10 @@ ${refList.map((r) => {
   const usesSubfig = doc.blocks.some((b) => b.type === 'figure' && (b.subfigures?.length ?? 0) > 0);
   const usesGraphics = doc.blocks.some((b) => b.type === 'figure');
   const usesBooktabs = doc.blocks.some((b) => b.type === 'table' && (b.topRule || b.bottomRule || b.headerRule));
+  // Springer/Elsevier classes bundle their own citation handling; loading the
+  // `cite` package on top breaks \cite (the \@citex error). Only IEEE/article
+  // need it.
+  const wantsCitePkg = family === 'ieee' || family === 'article';
   const pkgs = [
     '\\usepackage[T1]{fontenc}',
     '\\usepackage{textcomp}',
@@ -246,7 +258,7 @@ ${refList.map((r) => {
     usesGraphics ? '\\usepackage{graphicx}' : '',
     usesSubfig ? '\\usepackage{subcaption}' : '',
     usesBooktabs ? '\\usepackage{booktabs}' : '',
-    '\\usepackage{cite}',
+    wantsCitePkg ? '\\usepackage{cite}' : '',
   ].filter(Boolean).join('\n');
 
   const title = texEscape(doc.title || 'Untitled');
