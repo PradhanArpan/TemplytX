@@ -15,11 +15,39 @@ const REF_RE = /\[\[ref:([a-z0-9:-]+)\]\]/gi;
 
 /** Escape LaTeX special characters in plain author text. */
 function texEscape(s: string): string {
-  return s
+  return unicodeToLatex(s
     .replace(/\\/g, '\\textbackslash{}')
     .replace(/([&%$#_{}])/g, '\\$1')
     .replace(/~/g, '\\textasciitilde{}')
-    .replace(/\^/g, '\\textasciicircum{}');
+    .replace(/\^/g, '\\textasciicircum{}'));
+}
+
+/** Map common Unicode characters (Greek, math symbols) to LaTeX so pdflatex
+ *  accepts them without relying on Unicode font setup. */
+const UNICODE_MAP: Record<string, string> = {
+  'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta', 'ε': '\\epsilon',
+  'ζ': '\\zeta', 'η': '\\eta', 'θ': '\\theta', 'ι': '\\iota', 'κ': '\\kappa',
+  'λ': '\\lambda', 'μ': '\\mu', 'ν': '\\nu', 'ξ': '\\xi', 'π': '\\pi',
+  'ρ': '\\rho', 'σ': '\\sigma', 'τ': '\\tau', 'υ': '\\upsilon', 'φ': '\\phi',
+  'χ': '\\chi', 'ψ': '\\psi', 'ω': '\\omega',
+  'Γ': '\\Gamma', 'Δ': '\\Delta', 'Θ': '\\Theta', 'Λ': '\\Lambda', 'Ξ': '\\Xi',
+  'Π': '\\Pi', 'Σ': '\\Sigma', 'Φ': '\\Phi', 'Ψ': '\\Psi', 'Ω': '\\Omega',
+  '±': '\\pm', '×': '\\times', '÷': '\\div', '≤': '\\leq', '≥': '\\geq',
+  '≠': '\\neq', '≈': '\\approx', '∞': '\\infty', '∑': '\\sum', '∫': '\\int',
+  '√': '\\surd', '∂': '\\partial', '∇': '\\nabla', '∝': '\\propto', '∈': '\\in',
+  '→': '\\rightarrow', '←': '\\leftarrow', '↔': '\\leftrightarrow',
+  '°': '\\textdegree{}', '·': '\\cdot', '′': "'", '″': "''",
+  '–': '--', '—': '---', '“': '``', '”': "''", '‘': '`', '’': "'",
+};
+
+/** Replace Unicode symbols with LaTeX (Greek/math wrapped in math mode). */
+function unicodeToLatex(s: string): string {
+  return s.replace(/[^\x00-\x7F]/g, (ch) => {
+    const tex = UNICODE_MAP[ch];
+    if (!tex) return ch;
+    const isMath = /\\(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Phi|Psi|Omega|pm|times|div|leq|geq|neq|approx|infty|sum|int|surd|partial|nabla|propto|in|rightarrow|leftarrow|leftrightarrow|cdot)/.test(tex);
+    return isMath ? `$${tex}$` : tex;
+  });
 }
 
 /** Convert a reference id to a stable LaTeX cite key. */
@@ -55,6 +83,8 @@ function richToLatex(html: string, keyMap: Map<string, string>,
   s = s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
   // 4) Now escape LaTeX specials in the remaining TEXT only.
   s = s.replace(/([&%$#_{}])/g, '\\$1').replace(/~/g, '\\textasciitilde{}').replace(/\^/g, '\\textasciicircum{}');
+  // 4b) Convert Unicode Greek/symbols to LaTeX so pdflatex accepts them.
+  s = unicodeToLatex(s);
   // 5) Restore the protected LaTeX commands.
   s = s.replace(/\u0000(\d+)\u0000/g, (_m, i) => stash[Number(i)]);
   return s;
@@ -155,6 +185,9 @@ ${refList.map((r) => {
   const usesBooktabs = doc.blocks.some((b) => b.type === 'table' && (b.topRule || b.bottomRule || b.headerRule));
 
   return `\\documentclass[11pt]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[T1]{fontenc}
+\\usepackage{textcomp}
 \\usepackage[margin=1in]{geometry}
 \\usepackage{amsmath,amssymb}
 ${usesGraphics ? '\\usepackage{graphicx}' : ''}
