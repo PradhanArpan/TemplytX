@@ -86,10 +86,10 @@ export function DashboardScreen() {
               onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
               className={`${inputCls} flex-1 min-w-[220px]`} />
             <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputCls}>
-              {(['journal', 'thesis', 'report', 'proposal'] as const).map((type) => {
+              {(['journal', 'thesis', 'report', 'proposal', 'lab-report', 'cv'] as const).map((type) => {
                 const group = templates.filter((t) => t.type === type);
                 if (group.length === 0) return null;
-                const label = { journal: 'Journals', thesis: 'Thesis', report: 'Reports', proposal: 'Proposals' }[type];
+                const label = { journal: 'Journals', thesis: 'Thesis', report: 'Reports', proposal: 'Proposals', 'lab-report': 'Lab Reports', cv: 'Academic CV' }[type];
                 return (
                   <optgroup key={type} label={label}>
                     {group.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}

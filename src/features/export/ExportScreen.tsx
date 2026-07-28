@@ -92,10 +92,10 @@ export function ExportScreen() {
         Target format
       </div>
       <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={`${inputCls} mb-2`}>
-        {(['journal', 'thesis', 'report', 'proposal'] as const).map((type) => {
+        {(['journal', 'thesis', 'report', 'proposal', 'lab-report', 'cv'] as const).map((type) => {
           const group = templates.filter((t) => t.type === type);
           if (group.length === 0) return null;
-          const label = { journal: 'Journals', thesis: 'Thesis', report: 'Reports', proposal: 'Proposals' }[type];
+          const label = { journal: 'Journals', thesis: 'Thesis', report: 'Reports', proposal: 'Proposals', 'lab-report': 'Lab Reports', cv: 'Academic CV' }[type];
           return <optgroup key={type} label={label}>
             {group.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </optgroup>;

@@ -12,7 +12,7 @@ export type CitationStyle = 'ieee' | 'apa-7' | 'springer' | 'elsevier';
 
 /** What kind of document this template produces. Journals are the wedge;
  *  the platform serves many document kinds. */
-export type TemplateType = 'journal' | 'thesis' | 'report' | 'proposal';
+export type TemplateType = 'journal' | 'thesis' | 'report' | 'proposal' | 'lab-report' | 'cv';
 
 /** Who owns/can see a template. Global = shipped/published by admin;
  *  private = uploaded by a user (arrives with accounts). */

@@ -125,6 +125,39 @@ export const templateCatalog: Template[] = [
     ],
     isActive: true,
   },
+  {
+    id: 'tpl-lab-report', name: 'Lab Report', publisher: 'Generic', type: 'lab-report',
+    scope: 'admin-global', citationStyle: 'apa-7',
+    citationOrder: 'alphabetical',
+    sections: [
+      S('Title'), S('Abstract'), S('Introduction'), S('Materials and Methods'),
+      S('Results'), S('Discussion'), S('Conclusion'), S('References'),
+    ],
+    formatting: { paperSize: 'a4', columns: 1, lineSpacing: 'onehalf', bodyFont: 'Times New Roman', bodyFontPt: 12, numberSections: true },
+    rules: [
+      { ruleId: 'required-sections', severity: 'error' },
+      { ruleId: 'figure-cited-in-text', severity: 'warning' },
+    ],
+    isActive: true,
+  },
+  {
+    id: 'tpl-cv', name: 'Academic CV', publisher: 'Generic', type: 'cv',
+    scope: 'admin-global', citationStyle: 'apa-7',
+    citationOrder: 'alphabetical',
+    sections: [
+      S('Contact Information'), S('Research Interests', false),
+      S('Education'), S('Academic Appointments', false),
+      S('Publications'), S('Grants and Funding', false),
+      S('Teaching Experience', false), S('Conference Presentations', false),
+      S('Awards and Honors', false), S('Professional Service', false),
+      S('References', false),
+    ],
+    formatting: { paperSize: 'a4', columns: 1, lineSpacing: 'single', bodyFont: 'Calibri', bodyFontPt: 11, numberSections: false },
+    rules: [
+      { ruleId: 'required-sections', severity: 'warning' },
+    ],
+    isActive: true,
+  },
 ];
 
 /** Required section titles for a template — fed to the required-sections rule. */
