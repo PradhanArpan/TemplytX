@@ -27,6 +27,7 @@ export function ExportScreen() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [targetId, setTargetId] = useState<string>('');
   const [fmt, setFmt] = useState('pdf');
+  const [latexMode, setLatexMode] = useState<'submission' | 'cameraready'>('submission');
   const [includeAuthors, setIncludeAuthors] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -65,7 +66,7 @@ export function ExportScreen() {
       } else if (fmt === 'latex-src') {
         // Download the .tex source.
         const { buildLatex } = await import('./exportLatex');
-        const tex = buildLatex(docForExport, tpl);
+        const tex = buildLatex(docForExport, tpl, latexMode);
         const blob = new Blob([tex], { type: 'text/x-tex' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -74,7 +75,7 @@ export function ExportScreen() {
       } else if (fmt === 'latex-pdf') {
         // Send .tex to the local LaTeX server and open the compiled PDF.
         const { buildLatex } = await import('./exportLatex');
-        const tex = buildLatex(docForExport, tpl);
+        const tex = buildLatex(docForExport, tpl, latexMode);
         try {
           const res = await fetch(`${LATEX_SERVER}/compile`, {
             method: 'POST',
@@ -192,6 +193,24 @@ export function ExportScreen() {
         <div className="flex items-start gap-2 text-[13px] text-[var(--status-partial)] bg-[var(--status-partial-bg)] px-4 py-3 rounded-[var(--radius)] mb-4">
           <TriangleAlert size={15} className="shrink-0 mt-0.5" />
           <span>Not fully compliant with {tpl?.name}. You can export anyway, but it may be desk-rejected.</span>
+        </div>
+      )}
+
+      {(fmt === 'latex-pdf' || fmt === 'latex-src') && (
+        <div className="mb-3">
+          <div className="text-[12px] font-medium text-[var(--color-muted)] mb-1.5">LaTeX output mode</div>
+          <div className="flex gap-2">
+            <button onClick={() => setLatexMode('submission')}
+              className={`flex-1 text-left px-3 py-2 rounded-[var(--radius)] border cursor-pointer ${latexMode === 'submission' ? 'border-[var(--color-accent)] bg-[var(--color-accent-bg)]' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}>
+              <div className="text-[13px] font-medium text-[var(--color-text)]">Submission</div>
+              <div className="text-[11px] text-[var(--color-muted)]">Review manuscript — what you send first</div>
+            </button>
+            <button onClick={() => setLatexMode('cameraready')}
+              className={`flex-1 text-left px-3 py-2 rounded-[var(--radius)] border cursor-pointer ${latexMode === 'cameraready' ? 'border-[var(--color-accent)] bg-[var(--color-accent-bg)]' : 'border-[var(--color-border)] bg-[var(--color-surface)]'}`}>
+              <div className="text-[13px] font-medium text-[var(--color-text)]">Camera-ready</div>
+              <div className="text-[11px] text-[var(--color-muted)]">Final typeset look (e.g. two-column)</div>
+            </button>
+          </div>
         </div>
       )}
 

@@ -103,7 +103,9 @@ function richToLatex(html: string, keyMap: Map<string, string>,
   return s;
 }
 
-export function buildLatex(doc: TemplytXDocument, tpl: Template): string {
+export type LatexMode = 'submission' | 'cameraready';
+
+export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode = 'submission'): string {
   // Combine the document's stored references with the in-memory pool so
   // citations always resolve (the sync cache may be cold at export time).
   const syncPool = listReferencesSync();
@@ -131,14 +133,19 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template): string {
     else if (b.type === 'equation') { refLabels.set(b.id, `eq:${b.id.slice(0, 8)}`); refKind.set(b.id, 'equation'); }
   });
 
-  const isIEEE = tpl.citationStyle === 'ieee' || /ieee/i.test(tpl.name);
+  const family: 'ieee' | 'springer' | 'elsevier' | 'article' =
+    (tpl.citationStyle === 'ieee' || /ieee/i.test(tpl.name)) ? 'ieee'
+    : (tpl.citationStyle === 'springer' || /springer/i.test(tpl.name)) ? 'springer'
+    : (tpl.citationStyle === 'elsevier' || /elsevier/i.test(tpl.name)) ? 'elsevier'
+    : 'article';
+  const isJournal = family !== 'article';
 
-  // For IEEE, the abstract is an environment placed after \maketitle, not a
-  // numbered section. Detect an "Abstract" section and the paragraph(s) that
-  // follow it (until the next section) so we can lift them into \begin{abstract}.
+  // For journal classes, the abstract is an environment placed after
+  // \maketitle, not a numbered section. Lift the Abstract section + its
+  // following paragraph(s) into \begin{abstract}.
   let abstractTex = '';
   const abstractBlockIds = new Set<string>();
-  if (isIEEE) {
+  if (isJournal) {
     const idx = doc.blocks.findIndex((b) => b.type === 'section' && /^abstract$/i.test((b as { title: string }).title.trim()));
     if (idx !== -1) {
       abstractBlockIds.add(doc.blocks[idx].id);
@@ -242,22 +249,72 @@ ${refList.map((r) => {
     '\\usepackage{cite}',
   ].filter(Boolean).join('\n');
 
-  if (isIEEE) {
-    // IEEE two-column conference style with proper author blocks + abstract env.
+  const title = texEscape(doc.title || 'Untitled');
+  const abstractEnv = abstractTex ? `\\begin{abstract}\n${abstractTex}\n\\end{abstract}\n` : '';
+
+  if (family === 'ieee') {
+    // Camera-ready: two-column conference. Submission: single-column draft.
+    const classOpts = mode === 'submission' ? 'journal,draftcls,onecolumn' : 'conference';
     const authorBlock = doc.authors.length
       ? doc.authors.map((a) =>
           `\\IEEEauthorblockN{${texEscape(a.name)}}${a.affiliation ? `\n\\IEEEauthorblockA{${texEscape(a.affiliation)}}` : ''}`
         ).join('\n\\and\n')
       : '\\IEEEauthorblockN{Anonymous}';
-    const abstractEnv = abstractTex ? `\\begin{abstract}\n${abstractTex}\n\\end{abstract}\n` : '';
-    return `\\documentclass[conference]{IEEEtran}
+    return `\\documentclass[${classOpts}]{IEEEtran}
 \\usepackage[utf8]{inputenc}
 ${pkgs}
-\\title{${texEscape(doc.title || 'Untitled')}}
+\\title{${title}}
 \\author{${authorBlock}}
 \\begin{document}
 \\maketitle
 ${abstractEnv}${body}
+${bib}
+\\end{document}`;
+  }
+
+  if (family === 'springer') {
+    // Springer Nature sn-jnl. referee option = double-spaced submission.
+    const classOpts = mode === 'submission' ? 'sn-basic,referee' : 'sn-basic';
+    const authors = doc.authors.length ? doc.authors : [{ name: 'Anonymous', affiliation: '', id: '', isCorresponding: false }];
+    const affils = [...new Set(authors.map((a) => a.affiliation).filter(Boolean))];
+    const authorCmds = authors.map((a) => {
+      const idx = a.affiliation ? affils.indexOf(a.affiliation) + 1 : 1;
+      const star = a.isCorresponding ? '*' : '';
+      return `\\author${star}[${idx}]{\\fnm{}\\sur{${texEscape(a.name)}}}`;
+    }).join('\n');
+    const affilCmds = affils.length
+      ? affils.map((af, i) => `\\affil[${i + 1}]{${texEscape(af)}}`).join('\n')
+      : '\\affil{}';
+    return `\\documentclass[${classOpts}]{sn-jnl}
+\\usepackage[utf8]{inputenc}
+${pkgs}
+\\begin{document}
+\\title{${title}}
+${authorCmds}
+${affilCmds}
+${abstractTex ? `\\abstract{${abstractTex}}` : ''}
+\\maketitle
+${body}
+${bib}
+\\end{document}`;
+  }
+
+  if (family === 'elsevier') {
+    // Elsevier elsarticle. preprint = review submission; 3p/final = typeset.
+    const classOpts = mode === 'submission' ? 'preprint,12pt' : 'final,3p,times,twocolumn';
+    const authorCmds = (doc.authors.length ? doc.authors : [{ name: 'Anonymous', affiliation: '', id: '', isCorresponding: false }])
+      .map((a) => `\\author{${texEscape(a.name)}}${a.affiliation ? `\n\\address{${texEscape(a.affiliation)}}` : ''}`)
+      .join('\n');
+    return `\\documentclass[${classOpts}]{elsarticle}
+\\usepackage[utf8]{inputenc}
+${pkgs}
+\\begin{document}
+\\begin{frontmatter}
+\\title{${title}}
+${authorCmds}
+${abstractTex ? `\\begin{abstract}\n${abstractTex}\n\\end{abstract}` : ''}
+\\end{frontmatter}
+${body}
 ${bib}
 \\end{document}`;
   }
@@ -267,7 +324,7 @@ ${bib}
 \\usepackage[utf8]{inputenc}
 \\usepackage[margin=1in]{geometry}
 ${pkgs}
-\\title{${texEscape(doc.title || 'Untitled')}}
+\\title{${title}}
 \\author{${authorTex}}
 \\date{\\today}
 \\begin{document}
