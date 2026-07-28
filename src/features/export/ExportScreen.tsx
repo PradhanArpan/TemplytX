@@ -29,6 +29,7 @@ export function ExportScreen() {
   const [targetId, setTargetId] = useState<string>('');
   const [fmt, setFmt] = useState('pdf');
   const [latexMode, setLatexMode] = useState<'submission' | 'cameraready'>('submission');
+  const [customClass, setCustomClass] = useState('');
   const [includeAuthors, setIncludeAuthors] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -67,7 +68,7 @@ export function ExportScreen() {
       } else if (fmt === 'latex-src') {
         // Download the .tex source.
         const { buildLatex } = await import('./exportLatex');
-        const tex = buildLatex(docForExport, tpl, latexMode);
+        const tex = buildLatex(docForExport, tpl, latexMode, customClass);
         const blob = new Blob([tex], { type: 'text/x-tex' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -76,7 +77,7 @@ export function ExportScreen() {
       } else if (fmt === 'latex-pdf') {
         // Send .tex to the local LaTeX server and open the compiled PDF.
         const { buildLatex } = await import('./exportLatex');
-        const tex = buildLatex(docForExport, tpl, latexMode);
+        const tex = buildLatex(docForExport, tpl, latexMode, customClass);
         try {
           const res = await fetch(`${LATEX_SERVER}/compile`, {
             method: 'POST',
@@ -200,6 +201,14 @@ export function ExportScreen() {
               <div className="text-[13px] font-medium text-[var(--color-text)]">Camera-ready</div>
               <div className="text-[11px] text-[var(--color-muted)]">Final typeset look (e.g. two-column)</div>
             </button>
+          </div>
+          <div className="mt-2">
+            <label className="text-[12px] text-[var(--color-muted)]">
+              Custom journal class (optional) — for a template you dropped in the server's <code>classes</code> folder:
+            </label>
+            <input value={customClass} onChange={(e) => setCustomClass(e.target.value)}
+              placeholder="e.g. sn-jnl (leave blank to use the built-in mapping)"
+              className="w-full mt-1 text-[13px] px-2.5 py-1.5 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] outline-none focus:border-[var(--color-accent)]" />
           </div>
         </div>
       )}

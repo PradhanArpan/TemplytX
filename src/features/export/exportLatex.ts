@@ -105,7 +105,7 @@ function richToLatex(html: string, keyMap: Map<string, string>,
 
 export type LatexMode = 'submission' | 'cameraready';
 
-export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode = 'submission'): string {
+export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode = 'submission', customClass = ''): string {
   // Combine the document's stored references with the in-memory pool so
   // citations always resolve (the sync cache may be cold at export time).
   const syncPool = listReferencesSync();
@@ -263,6 +263,30 @@ ${refList.map((r) => {
 
   const title = texEscape(doc.title || 'Untitled');
   const abstractEnv = abstractTex ? `\\begin{abstract}\n${abstractTex}\n\\end{abstract}\n` : '';
+
+  // Custom uploaded journal class: use it directly with a GENERIC mapping.
+  // We do NOT force the 'cite' package (the class provides its own citation
+  // handling per Arpan's rule). thebibliography works across classes.
+  if (customClass.trim()) {
+    const cls = customClass.trim().replace(/[^a-zA-Z0-9._-]/g, '');
+    const genericPkgs = [
+      '\\usepackage[utf8]{inputenc}',
+      '\\usepackage[T1]{fontenc}',
+      '\\usepackage{amsmath,amssymb}',
+      usesGraphics ? '\\usepackage{graphicx}' : '',
+      usesSubfig ? '\\usepackage{subcaption}' : '',
+      usesBooktabs ? '\\usepackage{booktabs}' : '',
+    ].filter(Boolean).join('\n');
+    return `\\documentclass{${cls}}
+${genericPkgs}
+\\title{${title}}
+\\author{${authorTex}}
+\\begin{document}
+\\maketitle
+${abstractEnv}${body}
+${bib}
+\\end{document}`;
+  }
 
   if (family === 'ieee') {
     // Camera-ready: two-column conference. Submission: single-column draft.
