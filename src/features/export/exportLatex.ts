@@ -61,12 +61,25 @@ function citeKeyFor(id: string, keyMap: Map<string, string>): string {
  * sub -> \textsubscript, and the citation/cross-ref tokens.
  */
 function richToLatex(html: string, keyMap: Map<string, string>,
-  refLabels: Map<string, string>): string {
+  refLabels: Map<string, string>, refKind: Map<string, 'figure' | 'table' | 'equation'>): string {
   let s = html;
   // 1) Protect our tokens by converting them to placeholders first.
   const stash: string[] = [];
   const keep = (tex: string) => { stash.push(tex); return `\u0000${stash.length - 1}\u0000`; };
-  s = s.replace(REF_RE, (_m, id) => keep(`\\ref{${refLabels.get(id) ?? id}}`));
+  // Cross-refs: emit the word + \ref. Sentence-position aware: at the start of
+  // a sentence spell out "Figure"/"Equation"; mid-sentence abbreviate.
+  s = s.replace(REF_RE, (_m, id, offset: number) => {
+    const label = refLabels.get(id) ?? id;
+    const kind = refKind.get(id) ?? 'figure';
+    const before = html.slice(0, offset).replace(/<[^>]*>/g, '').replace(/\s+$/, '');
+    const atStart = before === '' || /[.!?]$/.test(before);
+    let word: string;
+    if (kind === 'figure') word = atStart ? 'Figure' : 'Fig.';
+    else if (kind === 'equation') word = atStart ? 'Equation' : 'Eq.';
+    else word = 'Table';
+    if (kind === 'equation') return keep(`${word}~(\\ref{${label}})`);
+    return keep(`${word}~\\ref{${label}}`);
+  });
   s = s.replace(/(?:\[\[cite:[a-z0-9-]+\]\]\s*)+/gi, (run) => {
     const ids = [...run.matchAll(CITE_RE)].map((m) => citeKeyFor(m[1], keyMap));
     return keep(`\\cite{${ids.join(',')}}`);
@@ -91,29 +104,42 @@ function richToLatex(html: string, keyMap: Map<string, string>,
 }
 
 export function buildLatex(doc: TemplytXDocument, tpl: Template): string {
-  const pool = listReferencesSync();
+  // Combine the document's stored references with the in-memory pool so
+  // citations always resolve (the sync cache may be cold at export time).
+  const syncPool = listReferencesSync();
+  const byId = new Map<string, typeof syncPool[number]>();
+  [...syncPool, ...(doc.references ?? [])].forEach((r) => byId.set(r.id, r));
+  const pool = [...byId.values()];
   const refList = orderedReferences(doc.blocks, pool, tpl);
 
   // Build stable cite keys per reference.
   const keyMap = new Map<string, string>();
-  refList.forEach((r, i) => keyMap.set(r.id, r.citeKey || `ref${i + 1}`));
+  // LaTeX cite keys must avoid special chars; sanitize to letters/digits.
+  refList.forEach((r, i) => {
+    const raw = r.citeKey || `ref${i + 1}`;
+    const safe = raw.replace(/[^a-zA-Z0-9]/g, '') || `ref${i + 1}`;
+    keyMap.set(r.id, safe);
+  });
 
-  // Cross-ref labels: figures/tables/equations get \label{fig:id} etc.
+  // Cross-ref labels + kinds: figures/tables/equations get \label{fig:id} etc.
   const refLabels = new Map<string, string>();
-  let figN = 0, tabN = 0, eqN = 0;
+  const refKind = new Map<string, 'figure' | 'table' | 'equation'>();
   doc.blocks.forEach((b) => {
-    if (b.type === 'figure') { figN++; refLabels.set(b.id, `fig:${b.id.slice(0, 8)}`);
-      (b.subfigures ?? []).forEach((s) => refLabels.set(`${b.id}:${s.id}`, `fig:${b.id.slice(0, 8)}:${s.id.slice(0, 6)}`)); }
-    else if (b.type === 'table') { tabN++; refLabels.set(b.id, `tab:${b.id.slice(0, 8)}`); }
-    else if (b.type === 'equation') { eqN++; refLabels.set(b.id, `eq:${b.id.slice(0, 8)}`); }
+    if (b.type === 'figure') { refLabels.set(b.id, `fig:${b.id.slice(0, 8)}`); refKind.set(b.id, 'figure');
+      (b.subfigures ?? []).forEach((s) => { refLabels.set(`${b.id}:${s.id}`, `fig:${b.id.slice(0, 8)}:${s.id.slice(0, 6)}`); refKind.set(`${b.id}:${s.id}`, 'figure'); }); }
+    else if (b.type === 'table') { refLabels.set(b.id, `tab:${b.id.slice(0, 8)}`); refKind.set(b.id, 'table'); }
+    else if (b.type === 'equation') { refLabels.set(b.id, `eq:${b.id.slice(0, 8)}`); refKind.set(b.id, 'equation'); }
   });
 
   const body = doc.blocks.map((b) => {
     switch (b.type) {
-      case 'section':
+      case 'section': {
+        // Abstract is special: unnumbered, conventionally set apart.
+        if (/^abstract$/i.test(b.title.trim())) return `\\section*{${texEscape(b.title)}}`;
         return `\\section{${texEscape(b.title)}}`;
+      }
       case 'paragraph':
-        return richToLatex(b.content, keyMap, refLabels) + '\n';
+        return richToLatex(b.content, keyMap, refLabels, refKind) + '\n';
       case 'equation': {
         const lbl = refLabels.get(b.id);
         return `\\begin{equation}\\label{${lbl}}\n${b.latex || ''}\n\\end{equation}`;
@@ -193,7 +219,7 @@ ${refList.map((r) => {
 ${usesGraphics ? '\\usepackage{graphicx}' : ''}
 ${usesSubfig ? '\\usepackage{subcaption}' : ''}
 ${usesBooktabs ? '\\usepackage{booktabs}' : ''}
-\\usepackage[numbers]{natbib}
+\\usepackage{cite}
 \\title{${texEscape(doc.title || 'Untitled')}}
 \\author{${authorTex}}
 \\date{\\today}
