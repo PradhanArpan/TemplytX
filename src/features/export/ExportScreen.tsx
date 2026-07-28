@@ -14,8 +14,11 @@ import { ReadinessGauge } from '../../components/ui/ReadinessGauge';
 const formats = [
   { id: 'pdf', label: 'PDF', hint: 'Publication-ready', icon: FileText },
   { id: 'docx', label: 'Word (.docx)', hint: 'Editable source', icon: FileType },
-  { id: 'latex', label: 'LaTeX source (.zip)', hint: 'For Overleaf', icon: FileCode },
+  { id: 'latex-pdf', label: 'LaTeX PDF (local)', hint: 'True typeset — needs local server', icon: FileCode },
+  { id: 'latex-src', label: 'LaTeX source (.tex)', hint: 'For Overleaf', icon: FileCode },
 ];
+
+const LATEX_SERVER = 'http://localhost:4711';
 
 export function ExportScreen() {
   const { id } = useParams();
@@ -48,14 +51,46 @@ export function ExportScreen() {
   const score = report ? report.score : null;
   const ready = score === 100;
 
+  const [latexError, setLatexError] = useState('');
+
   async function handleGenerate() {
     if (!doc || !tpl) return;
     setBusy(true);
+    setLatexError('');
     try {
       const docForExport = includeAuthors ? doc : { ...doc, authors: [] };
       if (fmt === 'docx') {
         const { exportDocx } = await import('./exportDocx');
         await exportDocx(docForExport, tpl);
+      } else if (fmt === 'latex-src') {
+        // Download the .tex source.
+        const { buildLatex } = await import('./exportLatex');
+        const tex = buildLatex(docForExport, tpl);
+        const blob = new Blob([tex], { type: 'text/x-tex' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${(doc.title || 'document').replace(/[^a-z0-9]+/gi, '_')}.tex`;
+        a.click(); URL.revokeObjectURL(url);
+      } else if (fmt === 'latex-pdf') {
+        // Send .tex to the local LaTeX server and open the compiled PDF.
+        const { buildLatex } = await import('./exportLatex');
+        const tex = buildLatex(docForExport, tpl);
+        try {
+          const res = await fetch(`${LATEX_SERVER}/compile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latex: tex }),
+          });
+          if (!res.ok) {
+            const msg = await res.text();
+            setLatexError(`LaTeX compile failed:\n${msg.slice(0, 800)}`);
+            return;
+          }
+          const blob = await res.blob();
+          window.open(URL.createObjectURL(blob), '_blank');
+        } catch {
+          setLatexError('Could not reach your local LaTeX server. Start it (run start-latex.bat or `node server.js`), then try again.');
+        }
       } else {
         exportPdf(docForExport, tpl);
       }
@@ -163,6 +198,14 @@ export function ExportScreen() {
       <Button variant="primary" className="w-full" onClick={handleGenerate} disabled={busy || !tpl}>
         {busy ? 'Generating…' : `Generate ${tpl?.name} ${fmt.toUpperCase()}`}
       </Button>
+      {fmt === 'latex-pdf' && !latexError && (
+        <p className="text-[12px] text-[var(--color-muted)] mt-2">
+          Requires your local LaTeX server running (start-latex.bat). True typeset PDF via pdflatex.
+        </p>
+      )}
+      {latexError && (
+        <pre className="text-[12px] text-[var(--status-error)] mt-2 whitespace-pre-wrap bg-[var(--status-error-bg)] p-2 rounded-[var(--radius)]">{latexError}</pre>
+      )}
     </motion.div>
   );
 }
