@@ -35,27 +35,28 @@ function citeKeyFor(id: string, keyMap: Map<string, string>): string {
 function richToLatex(html: string, keyMap: Map<string, string>,
   refLabels: Map<string, string>): string {
   let s = html;
-  // Cross-ref tokens -> \ref{...}
-  s = s.replace(REF_RE, (_m, id) => `\\ref{${refLabels.get(id) ?? id}}`);
-  // Citation tokens: group adjacent ones into a single \cite{a,b}
+  // 1) Protect our tokens by converting them to placeholders first.
+  const stash: string[] = [];
+  const keep = (tex: string) => { stash.push(tex); return `\u0000${stash.length - 1}\u0000`; };
+  s = s.replace(REF_RE, (_m, id) => keep(`\\ref{${refLabels.get(id) ?? id}}`));
   s = s.replace(/(?:\[\[cite:[a-z0-9-]+\]\]\s*)+/gi, (run) => {
     const ids = [...run.matchAll(CITE_RE)].map((m) => citeKeyFor(m[1], keyMap));
-    return `\\cite{${ids.join(',')}}`;
+    return keep(`\\cite{${ids.join(',')}}`);
   });
-  // Inline formatting tags -> LaTeX
+  // 2) Convert inline formatting tags to placeholders for their commands.
   s = s
-    .replace(/<(b|strong)>/gi, '\\textbf{').replace(/<\/(b|strong)>/gi, '}')
-    .replace(/<(i|em)>/gi, '\\textit{').replace(/<\/(i|em)>/gi, '}')
-    .replace(/<sup>/gi, '\\textsuperscript{').replace(/<\/sup>/gi, '}')
-    .replace(/<sub>/gi, '\\textsubscript{').replace(/<\/sub>/gi, '}')
-    .replace(/<br\s*\/?>/gi, '\\\\')
+    .replace(/<(b|strong)>/gi, () => keep('\\textbf{')).replace(/<\/(b|strong)>/gi, () => keep('}'))
+    .replace(/<(i|em)>/gi, () => keep('\\textit{')).replace(/<\/(i|em)>/gi, () => keep('}'))
+    .replace(/<sup>/gi, () => keep('\\textsuperscript{')).replace(/<\/sup>/gi, () => keep('}'))
+    .replace(/<sub>/gi, () => keep('\\textsubscript{')).replace(/<\/sub>/gi, () => keep('}'))
+    .replace(/<br\s*\/?>/gi, () => keep('\\\\'))
     .replace(/<[^>]+>/g, ''); // strip any other tags
-  // Escape bare LaTeX specials that are NOT part of our inserted commands.
-  // (We inserted \textbf{...}, \cite{...}, \ref{...}; protect & % # $ _ in text.)
-  s = s.replace(/([&%#$])/g, '\\$1');
-  // Decode a few common HTML entities.
-  s = s.replace(/&amp;/g, '\\&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-       .replace(/&nbsp;/g, '~');
+  // 3) Decode common HTML entities to plain chars (so they get escaped next).
+  s = s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
+  // 4) Now escape LaTeX specials in the remaining TEXT only.
+  s = s.replace(/([&%$#_{}])/g, '\\$1').replace(/~/g, '\\textasciitilde{}').replace(/\^/g, '\\textasciicircum{}');
+  // 5) Restore the protected LaTeX commands.
+  s = s.replace(/\u0000(\d+)\u0000/g, (_m, i) => stash[Number(i)]);
   return s;
 }
 
@@ -90,23 +91,24 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template): string {
       case 'figure': {
         const lbl = refLabels.get(b.id);
         const cap = texEscape(b.caption || '');
+        // Local pdflatex can't fetch remote (http) images. If the src is a
+        // remote URL, use a placeholder box so the document still compiles.
+        // (The server-side image fetch will replace these once enabled.)
+        const localImg = (src: string, w: string) =>
+          src && !/^https?:\/\//i.test(src)
+            ? `\\includegraphics[width=${w}]{${src}}`
+            : `\\fbox{\\parbox[c][2cm][c]{${w}}{\\centering [figure]}}`;
         if (b.subfigures && b.subfigures.length > 0) {
           const per = b.perRow ?? 2;
-          const w = (0.95 / per).toFixed(2);
+          const wv = (0.95 / per).toFixed(2);
           const subs = b.subfigures.map((s) => {
             const slbl = refLabels.get(`${b.id}:${s.id}`);
-            const img = s.src
-              ? `\\includegraphics[width=\\linewidth]{${s.src}}`
-              : `\\fbox{\\rule{0pt}{2cm}\\rule{2cm}{0pt}}`;
-            return `  \\begin{subfigure}{${w}\\textwidth}\n    ${img}\n    \\caption{${texEscape(s.caption || '')}}\\label{${slbl}}\n  \\end{subfigure}`;
+            return `  \\begin{subfigure}{${wv}\\textwidth}\n    \\centering\n    ${localImg(s.src, '\\linewidth')}\n    \\caption{${texEscape(s.caption || '')}}\\label{${slbl}}\n  \\end{subfigure}`;
           }).join('\n  \\hfill\n');
           return `\\begin{figure}[htbp]\n  \\centering\n${subs}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{figure}`;
         }
         const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
-        const img = b.src
-          ? `\\includegraphics[width=${width}\\linewidth]{${b.src}}`
-          : `\\fbox{\\rule{0pt}{3cm}\\rule{4cm}{0pt}}`;
-        return `\\begin{figure}[htbp]\n  \\centering\n  ${img}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{figure}`;
+        return `\\begin{figure}[htbp]\n  \\centering\n  ${localImg(b.src, `${width}\\linewidth`)}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{figure}`;
       }
       case 'table': {
         const lbl = refLabels.get(b.id);
