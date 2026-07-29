@@ -48,12 +48,31 @@ function BlockShell({ children, onDelete, blockId }: {
 }
 
 export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlock>) {
+  const level = block.level ?? 1;
+  const levelLabel = level === 1 ? 'Chapter' : level === 2 ? 'Section' : 'Subsection';
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
-      <input value={block.title} placeholder="Section title"
-        onChange={(e) => onChange({ title: e.target.value })}
-        style={{ ...bare, fontFamily: 'var(--font-document)', fontWeight: 600,
-          fontSize: block.level === 1 ? 19 : 17, marginTop: 10 }} />
+      <div style={{ marginLeft: (level - 1) * 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+            textTransform: 'uppercase', color: 'var(--color-faint)',
+            background: 'var(--color-surface-2)', padding: '1px 6px', borderRadius: 4 }}>
+            {levelLabel}
+          </span>
+          <button title="Promote (outdent)" onClick={() => onChange({ level: Math.max(1, level - 1) })}
+            disabled={level === 1}
+            style={{ border: 'none', background: 'transparent', cursor: level === 1 ? 'default' : 'pointer',
+              color: level === 1 ? 'var(--color-faint)' : 'var(--color-muted)', fontSize: 13, padding: '0 3px', opacity: level === 1 ? 0.4 : 1 }}>◄</button>
+          <button title="Demote (indent)" onClick={() => onChange({ level: Math.min(3, level + 1) })}
+            disabled={level === 3}
+            style={{ border: 'none', background: 'transparent', cursor: level === 3 ? 'default' : 'pointer',
+              color: level === 3 ? 'var(--color-faint)' : 'var(--color-muted)', fontSize: 13, padding: '0 3px', opacity: level === 3 ? 0.4 : 1 }}>►</button>
+        </div>
+        <input value={block.title} placeholder={`${levelLabel} title`}
+          onChange={(e) => onChange({ title: e.target.value })}
+          style={{ ...bare, fontFamily: 'var(--font-document)', fontWeight: 600,
+            fontSize: level === 1 ? 19 : level === 2 ? 16 : 14 }} />
+      </div>
     </BlockShell>
   );
 }

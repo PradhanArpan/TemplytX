@@ -170,7 +170,9 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
       case 'section': {
         // Abstract is special: unnumbered, conventionally set apart.
         if (/^abstract$/i.test(b.title.trim())) return `\\section*{${texEscape(b.title)}}`;
-        return `\\section{${texEscape(b.title)}}`;
+        const lvl = (b as { level?: number }).level ?? 1;
+        const cmd = lvl <= 1 ? 'section' : lvl === 2 ? 'subsection' : 'subsubsection';
+        return `\\${cmd}{${texEscape(b.title)}}`;
       }
       case 'paragraph':
         return richToLatex(b.content, keyMap, refLabels, refKind) + '\n';

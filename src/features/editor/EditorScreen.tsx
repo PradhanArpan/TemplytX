@@ -158,8 +158,13 @@ export function EditorScreen() {
   const saveChristMeta = useCallback((m: ChristThesisMeta) => {
     setChristMeta(m);
     setSaved(false);
-    if (id) updateDocument(id, { christThesis: m }).then(() => setSaved(true));
-  }, [id]);
+    // Keep the document's title in sync with the thesis title (single source
+    // of truth), so the document list and internal title stay meaningful.
+    const patch: Partial<TemplytXDocument> = { christThesis: m };
+    const projTitle = (m.projectTitleTwo || m.projectTitle || '').trim();
+    if (projTitle && projTitle !== docTitle) { patch.title = projTitle; setDocTitle(projTitle); }
+    if (id) updateDocument(id, patch).then(() => setSaved(true));
+  }, [id, docTitle]);
 
   const applyBlocks = useCallback((next: DocumentBlock[]) => {
     setBlocks(next);
@@ -428,8 +433,10 @@ export function EditorScreen() {
         {/* center: writing surface with reorder + insert */}
         <section className="min-w-0 overflow-y-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 min-[1200px]:px-10 py-4 sm:py-8 bg-[var(--color-bg)]">
           <div className="max-w-[760px] min-h-[calc(100%-32px)] mx-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-paper)] px-5 py-7 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
-            <FrontMatter title={docTitle} authors={authors}
-              onTitle={saveTitle} onAuthors={saveAuthors} />
+            {tpl?.id !== 'tpl-christ-thesis' && (
+              <FrontMatter title={docTitle} authors={authors}
+                onTitle={saveTitle} onAuthors={saveAuthors} />
+            )}
             {tpl?.id === 'tpl-christ-thesis' && (
               <div className="mb-4 flex items-center gap-2 flex-wrap p-2.5 rounded-[var(--radius)] bg-[var(--color-accent-bg)] border border-[var(--color-accent)]/30">
                 <span className="text-[13px] text-[var(--color-text)]">
