@@ -26,21 +26,21 @@ export function TargetMenu({ templates, value, onChange }: {
 
   const selected = templates.find((t) => t.id === value);
 
-  const colCls = 'w-full sm:w-auto sm:min-w-[190px] max-h-[300px] overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] py-1';
-  const itemCls = 'w-full text-left text-[13px] px-3 py-2 cursor-pointer border-none bg-transparent text-[var(--color-text)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] flex items-center justify-between gap-2';
+  const colCls = 'w-full sm:w-auto sm:min-w-[200px] max-h-[300px] overflow-y-auto bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] p-1.5';
+  const itemCls = 'w-full text-left text-[13px] font-medium px-3 py-2.5 cursor-pointer border-none rounded-[var(--radius)] bg-transparent text-[var(--color-text)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] flex items-center justify-between gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]';
 
   return (
     <div className="relative mb-2 min-w-0" onMouseLeave={() => { setOpen(false); setCat(null); }}>
       <button type="button" onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu" aria-expanded={open} aria-controls="target-template-menu"
-        className="w-full text-left text-[14px] px-3 py-2 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center justify-between">
+        className="w-full min-h-11 text-left text-[14px] px-3.5 py-2 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center justify-between shadow-[var(--shadow-card)] hover:border-[var(--color-accent)] transition-[border-color,box-shadow] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]">
         <span className="min-w-0 truncate">{selected ? selected.name : 'Choose a target…'}</span>
         <span className="text-[var(--color-faint)]">▾</span>
       </button>
 
       {open && (
         <div id="target-template-menu" role="menu"
-          className="absolute z-40 top-11 left-0 right-0 sm:right-auto flex flex-col sm:flex-row items-stretch sm:items-start gap-1">
+          className="absolute z-40 top-12 left-0 right-0 sm:right-auto flex flex-col sm:flex-row items-stretch sm:items-start gap-1.5">
           <div className={colCls}>
             {cats.map((c) => (
               <button type="button" role="menuitem" key={c.type} className={itemCls}
