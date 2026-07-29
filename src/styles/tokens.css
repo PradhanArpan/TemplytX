@@ -15,22 +15,23 @@
 @custom-variant dark ([data-theme="dark"] &);
 
 :root, [data-theme="light"] {
-  --color-bg:            #FBFBFA;
+  --color-bg:            #F4F7FB;
   --color-surface:       #FFFFFF;
-  --color-surface-2:     #F5F5F3;
-  --color-border:        #E7E6E2;
-  --color-border-strong: #D6D5D0;
+  --color-surface-2:     #F7F9FC;
+  --color-surface-raised:#FFFFFF;
+  --color-border:        #DFE6EF;
+  --color-border-strong: #C9D3E0;
 
-  --color-text:   #1A1A19;
-  --color-muted:  #6B6A66;
-  --color-faint:  #74736E;
+  --color-text:   #172033;
+  --color-muted:  #5B6B80;
+  --color-faint:  #6B788B;
 
-  --color-accent:       #185FA5;
-  --color-accent-hover: #124A82;
-  --color-accent-bg:    #E6F1FB;
-  --color-accent-text:  #0C447C;
-  --color-primary-solid:       #185FA5;
-  --color-primary-solid-hover: #124A82;
+  --color-accent:       #245FA7;
+  --color-accent-hover: #194B89;
+  --color-accent-bg:    #EAF2FC;
+  --color-accent-text:  #174B88;
+  --color-primary-solid:       #1F5FA8;
+  --color-primary-solid-hover: #174D8C;
 
   --status-ready:       #0F6E56;
   --status-ready-bg:    #E1F5EE;
@@ -40,12 +41,13 @@
   --status-error-bg:    #FCEBEB;
   --status-none:        #9A9A96;
 
-  --shadow-card:  0 1px 2px rgba(26,26,25,.04), 0 1px 3px rgba(26,26,25,.06);
-  --shadow-hover: 0 2px 6px rgba(26,26,25,.06), 0 6px 16px rgba(26,26,25,.07);
-  --shadow-modal: 0 8px 30px rgba(26,26,25,.12), 0 2px 8px rgba(26,26,25,.08);
+  --shadow-card:  0 1px 2px rgba(23,32,51,.04), 0 4px 14px rgba(23,32,51,.045);
+  --shadow-hover: 0 2px 5px rgba(23,32,51,.06), 0 14px 30px rgba(23,32,51,.09);
+  --shadow-modal: 0 20px 50px rgba(23,32,51,.16), 0 4px 14px rgba(23,32,51,.08);
+  --shadow-paper: 0 1px 2px rgba(23,32,51,.04), 0 12px 36px rgba(23,32,51,.08);
 
-  --radius: 8px;
-  --radius-lg: 12px;
+  --radius: 10px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
 
   --ease: cubic-bezier(.4,0,.2,1);
@@ -59,22 +61,23 @@
 }
 
 [data-theme="dark"] {
-  --color-bg:            #17181A;
-  --color-surface:       #1E2023;
-  --color-surface-2:     #26282C;
-  --color-border:        #33363B;
-  --color-border-strong: #444951;
+  --color-bg:            #10151D;
+  --color-surface:       #171D27;
+  --color-surface-2:     #1D2531;
+  --color-surface-raised:#1B222D;
+  --color-border:        #2A3544;
+  --color-border-strong: #3B495B;
 
-  --color-text:  #ECECEA;
-  --color-muted: #A0A09B;
-  --color-faint: #858580;
+  --color-text:  #F1F5FA;
+  --color-muted: #A8B4C4;
+  --color-faint: #8F9BAD;
 
-  --color-accent:       #6BA6E8;
-  --color-accent-hover: #85B7EB;
-  --color-accent-bg:    #16324F;
-  --color-accent-text:  #B5D4F4;
-  --color-primary-solid:       #2A6FB0;
-  --color-primary-solid-hover: #235F98;
+  --color-accent:       #7CB5F2;
+  --color-accent-hover: #9AC8F7;
+  --color-accent-bg:    #183453;
+  --color-accent-text:  #C6E1FC;
+  --color-primary-solid:       #337FC8;
+  --color-primary-solid-hover: #428ED4;
 
   --status-ready:      #5DCAA5;
   --status-ready-bg:   #0C3A2E;
@@ -84,9 +87,10 @@
   --status-error-bg:   #3A1A1A;
   --status-none:       #6E6E6A;
 
-  --shadow-card:  0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.4);
-  --shadow-hover: 0 2px 8px rgba(0,0,0,.4), 0 8px 20px rgba(0,0,0,.45);
-  --shadow-modal: 0 8px 30px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
+  --shadow-card:  0 1px 2px rgba(0,0,0,.28), 0 5px 16px rgba(0,0,0,.2);
+  --shadow-hover: 0 4px 10px rgba(0,0,0,.28), 0 18px 36px rgba(0,0,0,.28);
+  --shadow-modal: 0 24px 56px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.3);
+  --shadow-paper: 0 1px 2px rgba(0,0,0,.25), 0 16px 42px rgba(0,0,0,.3);
 }
 
 * { box-sizing: border-box; }
@@ -101,6 +105,19 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.tx-app-shell {
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--color-accent) 7%, transparent) 0, transparent 28rem),
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--status-ready) 5%, transparent) 0, transparent 24rem);
+  background-attachment: fixed;
+}
+
+* {
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-width: thin;
 }
 
 .tx-document { font-family: var(--font-document); }

@@ -36,22 +36,32 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
   }
 
   const btn =
-    'p-1.5 rounded cursor-pointer text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-colors border-none bg-transparent';
+    'min-h-7 min-w-7 inline-flex items-center justify-center rounded-md cursor-pointer text-[var(--color-muted)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] transition-colors border-none bg-transparent ' +
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]';
 
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)]">
+    <div className="flex items-center gap-0.5 px-1.5 py-1 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
       {/* onMouseDown + preventDefault keeps the editor selection alive */}
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); run('bold'); }} className={btn} title="Bold (Ctrl+B)"><Bold size={15} /></button>
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); run('italic'); }} className={btn} title="Italic (Ctrl+I)"><Italic size={15} /></button>
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); runScript('superscript'); }} className={btn} title="Superscript (toggle)"><Superscript size={15} /></button>
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); runScript('subscript'); }} className={btn} title="Subscript (toggle)"><Subscript size={15} /></button>
+      <button type="button" aria-label="Bold" onMouseDown={(e) => { e.preventDefault(); run('bold'); }}
+        onClick={(e) => { if (e.detail === 0) run('bold'); }} className={btn} title="Bold (Ctrl+B)"><Bold size={15} /></button>
+      <button type="button" aria-label="Italic" onMouseDown={(e) => { e.preventDefault(); run('italic'); }}
+        onClick={(e) => { if (e.detail === 0) run('italic'); }} className={btn} title="Italic (Ctrl+I)"><Italic size={15} /></button>
+      <button type="button" aria-label="Superscript" onMouseDown={(e) => { e.preventDefault(); runScript('superscript'); }}
+        onClick={(e) => { if (e.detail === 0) runScript('superscript'); }} className={btn} title="Superscript (toggle)"><Superscript size={15} /></button>
+      <button type="button" aria-label="Subscript" onMouseDown={(e) => { e.preventDefault(); runScript('subscript'); }}
+        onClick={(e) => { if (e.detail === 0) runScript('subscript'); }} className={btn} title="Subscript (toggle)"><Subscript size={15} /></button>
       <div className="relative">
-        <button type="button" onMouseDown={(e) => { e.preventDefault(); setShowSymbols((s) => !s); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
+        <button type="button" aria-label="Insert symbol" aria-haspopup="menu" aria-expanded={showSymbols} aria-controls="editor-symbol-menu"
+          onMouseDown={(e) => { e.preventDefault(); setShowSymbols((s) => !s); }}
+          onClick={(e) => { if (e.detail === 0) setShowSymbols((s) => !s); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
         {showSymbols && (
-          <div className="absolute z-30 top-9 left-0 w-[248px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-0.5">
+          <div id="editor-symbol-menu" role="menu" aria-label="Symbols"
+            className="absolute z-30 top-9 left-0 w-[256px] p-2.5 bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-1">
             {SYMBOLS.map((s) => (
-              <button key={s} type="button" onMouseDown={(e) => { e.preventDefault(); insertSymbol(s); }}
-                className="text-[15px] p-1 rounded hover:bg-[var(--color-accent-bg)] cursor-pointer border-none bg-transparent text-[var(--color-text)]">
+              <button key={s} type="button" role="menuitem" aria-label={`Insert ${s}`}
+                onMouseDown={(e) => { e.preventDefault(); insertSymbol(s); }}
+                onClick={(e) => { if (e.detail === 0) insertSymbol(s); }}
+                className="text-[15px] min-h-7 rounded-md hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] cursor-pointer border-none bg-transparent text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]">
                 {s}
               </button>
             ))}

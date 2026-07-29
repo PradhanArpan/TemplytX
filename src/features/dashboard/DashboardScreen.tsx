@@ -1,3 +1,4 @@
+import { TargetMenu } from '../export/TargetMenu';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -50,8 +51,8 @@ export function DashboardScreen() {
     'focus:border-[var(--color-accent)] transition-colors';
 
   return (
-    <div className="max-w-[780px] mx-auto px-4 sm:px-6 py-8 sm:py-10">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-6">
+    <div className="max-w-[780px] mx-auto px-6 py-10">
+      <div className="flex justify-between items-end mb-6">
         <div>
           <motion.h1
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
@@ -64,11 +65,11 @@ export function DashboardScreen() {
             {docs === null ? '…' : `${docs.length} document${docs.length === 1 ? '' : 's'}`}
           </p>
         </div>
-        <div className="flex max-[399px]:flex-col w-full sm:w-auto items-center gap-2">
-          <Button variant="secondary" className="w-full min-[400px]:flex-1 sm:w-auto sm:flex-none whitespace-nowrap" onClick={() => navigate('/templates/upload')}>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => navigate('/templates/upload')}>
             <Upload size={15} /> Upload template
           </Button>
-          <Button variant={creating ? 'secondary' : 'primary'} className="w-full min-[400px]:flex-1 sm:w-auto sm:flex-none whitespace-nowrap" onClick={() => setCreating((v) => !v)}>
+          <Button variant={creating ? 'secondary' : 'primary'} onClick={() => setCreating((v) => !v)}>
             {creating ? 'Cancel' : <><Plus size={15} /> New document</>}
           </Button>
         </div>
@@ -80,24 +81,15 @@ export function DashboardScreen() {
           transition={{ duration: 0.2, ease: 'easeOut' }}
           className="overflow-hidden mb-6"
         >
-          <Card className="p-4 flex gap-3 items-center flex-wrap min-w-0">
+          <Card className="p-4 flex gap-3 items-center flex-wrap">
             <input autoFocus placeholder="Document title" value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-              className={`${inputCls} flex-1 basis-full sm:basis-auto min-w-0 sm:min-w-[220px]`} />
-            <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={`${inputCls} w-full sm:w-auto min-w-0`}>
-              {(['journal', 'thesis', 'report', 'proposal', 'lab-report', 'cv'] as const).map((type) => {
-                const group = templates.filter((t) => t.type === type);
-                if (group.length === 0) return null;
-                const label = { journal: 'Journals', thesis: 'Thesis', report: 'Reports', proposal: 'Proposals', 'lab-report': 'Lab Reports', cv: 'Academic CV' }[type];
-                return (
-                  <optgroup key={type} label={label}>
-                    {group.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </optgroup>
-                );
-              })}
-            </select>
-            <Button variant="primary" className="w-full sm:w-auto" onClick={handleCreate}>Create</Button>
+              className={`${inputCls} flex-1 min-w-[220px]`} />
+            <div className="min-w-[220px]">
+              <TargetMenu templates={templates} value={templateId} onChange={setTemplateId} />
+            </div>
+            <Button variant="primary" onClick={handleCreate}>Create</Button>
           </Card>
         </motion.div>
       )}
@@ -130,7 +122,7 @@ export function DashboardScreen() {
                 variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
               >
-                <Card onClick={() => navigate(`/doc/${d.id}`)} className="p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0 group">
+                <Card onClick={() => navigate(`/doc/${d.id}`)} className="p-5 flex items-center gap-4 group">
                   <div className="flex-1 min-w-0">
                     <div className="tx-document text-[18px] font-medium text-[var(--color-text)] mb-2 truncate">
                       {d.title}

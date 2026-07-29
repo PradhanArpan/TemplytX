@@ -110,21 +110,21 @@ export interface Author {
 
 /** CHRIST SoET thesis institutional metadata (fills ProjectVariables.tex). */
 export interface ChristThesisMeta {
-  projectTitle: string;        // ALL CAPS
-  projectTitleTwo: string;     // Title Case
-  dissertationType: string;    // e.g. "A Project Report on"
-  programNameUpper: string;    // e.g. BACHELOR OF TECHNOLOGY
-  programName: string;         // e.g. Bachelor of Technology
-  programNameShort: string;    // e.g. B.Tech.
-  specialization: string;      // e.g. Civil Engineering
-  authors: { name: string; regNo: string; department: string }[]; // up to 5
+  projectTitle: string;
+  projectTitleTwo: string;
+  dissertationType: string;
+  programNameUpper: string;
+  programName: string;
+  programNameShort: string;
+  specialization: string;
+  authors: { name: string; regNo: string; department: string }[];
   guideName: string; guideDesignation: string; guideDepartment: string;
   coGuideName: string; coGuideDesignation: string; coGuideDepartment: string;
   departmentName: string; collegeName: string;
   hodName: string; hodDesignation: string;
-  projectDate: string;         // Month-YYYY
-  academicYear: string;        // YYYY-YYYY
-  weOrI: string;               // "We" or "I"
+  projectDate: string;
+  academicYear: string;
+  weOrI: string;
   dateOfDeclaration: string;
   keywords: string;
 }
@@ -144,7 +144,6 @@ export interface TemplytXDocument {
   readinessScore: number | null;
   blocks: DocumentBlock[];
   references: Reference[];
-  /** CHRIST thesis institutional metadata, when using that template. */
   christThesis?: ChristThesisMeta;
   createdAt: string;
   updatedAt: string;

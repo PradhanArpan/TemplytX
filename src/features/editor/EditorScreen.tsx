@@ -61,8 +61,12 @@ export function EditorScreen() {
   const [saved, setSaved] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [panel, setPanel] = useState<'left' | 'right' | null>(null);
+  const [compactPanels, setCompactPanels] = useState(() => window.matchMedia('(max-width: 1199px)').matches);
   const [refKey, setRefKey] = useState(0); // bump to refresh the left ref panel
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const panelTrigger = useRef<HTMLButtonElement | null>(null);
+  const leftPanel = useRef<HTMLElement | null>(null);
+  const rightPanel = useRef<HTMLElement | null>(null);
   // Tracks the last caret position inside a rich paragraph: the block id and
   // a cloned Range, so we can insert exactly there even after focus moves to
   // the reference panel (clicking the panel would otherwise lose the caret).
@@ -86,6 +90,52 @@ export function EditorScreen() {
     document.addEventListener('selectionchange', onSelChange);
     return () => document.removeEventListener('selectionchange', onSelChange);
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1199px)');
+    const sync = () => {
+      setCompactPanels(media.matches);
+      if (!media.matches) setPanel(null);
+    };
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!panel || !compactPanels) return;
+    const container = panel === 'left' ? leftPanel.current : rightPanel.current;
+    if (!container) return;
+
+    const focusable = () => [...container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )];
+    focusable()[0]?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setPanel(null);
+        requestAnimationFrame(() => panelTrigger.current?.focus());
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [compactPanels, panel]);
 
   useEffect(() => {
     if (!id) return;
@@ -169,6 +219,16 @@ export function EditorScreen() {
     setDragId(null);
   }
 
+  function moveBlock(blockId: string, direction: -1 | 1) {
+    const from = blocks.findIndex((block) => block.id === blockId);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= blocks.length) return;
+    const next = [...blocks];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    applyBlocks(next);
+  }
+
   /** Cite a reference: insert [[cite:id]] at the cursor in the focused paragraph. */
   function cite(ref: Reference) {
     const c = cursor.current;
@@ -249,12 +309,17 @@ export function EditorScreen() {
   function goToBlock(blockId?: string) {
     if (!blockId) return;
     document.getElementById(`block-${blockId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    closePanel();
+  }
+
+  function closePanel() {
     setPanel(null);
+    requestAnimationFrame(() => panelTrigger.current?.focus());
   }
 
   if (!doc) {
     return (
-      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[210px_1fr_276px] h-[calc(100dvh-56px)]">
+      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[232px_1fr_288px] h-[calc(100dvh-56px)]">
         <div className="hidden min-[1200px]:block border-r border-[var(--color-border)] p-5"><Skeleton className="h-5 w-24 mb-4" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-3/4" /></div>
         <div className="p-6 sm:p-10"><Skeleton className="h-7 w-2/3 mb-6" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></div>
         <div className="hidden min-[1200px]:flex border-l border-[var(--color-border)] p-5 flex-col items-center"><Skeleton className="h-28 w-28 rounded-full mb-4" /><Skeleton className="h-9 w-full" /></div>
@@ -271,19 +336,19 @@ export function EditorScreen() {
   return (
     <div className="flex flex-col h-[calc(100dvh-56px)] min-h-0 overflow-hidden">
       {/* toolbar */}
-      <div className="flex items-center justify-between gap-2 px-3 sm:px-6 h-[52px] shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-5 h-[52px] shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_1px_0_rgba(23,32,51,.02)]">
         <div className="flex flex-1 items-center gap-2 sm:gap-3 min-w-0">
           <button onClick={() => navigate('/')} aria-label="Back to documents"
-            className="p-1.5 rounded-[var(--radius)] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors border-none bg-transparent">
+            className="min-w-8 min-h-8 inline-flex items-center justify-center rounded-[var(--radius)] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-colors border border-transparent bg-transparent">
             <ArrowLeft size={17} />
           </button>
-          <span className="tx-document text-[18px] font-medium truncate">{docTitle || "Untitled"}</span>
+          <span className="tx-document text-[18px] font-semibold tracking-[-0.01em] truncate">{docTitle || "Untitled"}</span>
           {tpl && <span className="hidden lg:inline-flex"><Badge tone="accent">{tpl.name}</Badge></span>}
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <AnimatePresence mode="wait">
             <motion.span key={saved ? 'saved' : 'saving'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }} className="text-[12px] text-[var(--color-faint)]">
+              transition={{ duration: 0.15 }} className="text-[11px] font-medium text-[var(--color-faint)]">
               {saved ? 'Saved' : 'Saving…'}
             </motion.span>
           </AnimatePresence>
@@ -292,7 +357,7 @@ export function EditorScreen() {
       </div>
 
       {/* Shared formatting toolbar (Word-like) — acts on the focused block. */}
-      <div className="flex items-center gap-2 px-3 sm:px-6 h-[44px] shrink-0 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+      <div className="flex items-center gap-2 px-3 sm:px-5 h-[48px] shrink-0 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
         <EditorToolbar onAfter={() => {
           const el = document.activeElement as HTMLElement | null;
           if (el && el.getAttribute('contenteditable') === 'true') {
@@ -300,33 +365,38 @@ export function EditorScreen() {
           }
         }} />
         <RefMenu blocks={blocks} onPick={(refId) => insertXref(refId)} />
-        <div className="flex items-center gap-1 ml-auto min-[1200px]:hidden">
-          <button type="button" onClick={() => setPanel('left')} aria-label="Open outline and references"
-            className="flex items-center gap-1.5 whitespace-nowrap text-[12px] px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer">
+        <div className="flex items-center gap-1.5 ml-auto min-[1200px]:hidden">
+          <button type="button" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel('left'); }}
+            aria-label="Open outline and references" aria-expanded={panel === 'left'} aria-controls="editor-left-panel"
+            className="flex min-h-8 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors">
             <PanelLeft size={14} /><span className="hidden sm:inline">Outline</span>
           </button>
-          <button type="button" onClick={() => setPanel('right')} aria-label="Open readiness and labels"
-            className="flex items-center gap-1.5 whitespace-nowrap text-[12px] px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer">
+          <button type="button" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel('right'); }}
+            aria-label="Open readiness and labels" aria-expanded={panel === 'right'} aria-controls="editor-right-panel"
+            className="flex min-h-8 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors">
             <PanelRight size={14} /><span className="hidden sm:inline">Readiness</span>
           </button>
         </div>
       </div>
 
       {panel && (
-        <button type="button" aria-label="Close editor panel" onClick={() => setPanel(null)}
-          className="fixed inset-x-0 top-14 bottom-0 z-40 bg-black/30 border-none min-[1200px]:hidden" />
+        <button type="button" tabIndex={-1} aria-label="Close editor panel" onClick={closePanel}
+          className="fixed inset-x-0 top-14 bottom-0 z-40 bg-[#0b1220]/45 backdrop-blur-[2px] border-none min-[1200px]:hidden" />
       )}
 
-      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[210px_1fr_276px] flex-1 min-h-0 min-w-0">
+      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[232px_1fr_288px] flex-1 min-h-0 min-w-0">
         {/* left: outline + reference pool */}
-        <aside className={`border-r border-[var(--color-border)] px-4 py-5 overflow-y-auto bg-[var(--color-bg)]
+        <aside id="editor-left-panel" ref={leftPanel}
+          inert={compactPanels && panel !== 'left'} aria-hidden={compactPanels && panel !== 'left'}
+          role={compactPanels && panel === 'left' ? 'dialog' : undefined} aria-modal={compactPanels && panel === 'left' ? true : undefined}
+          aria-label="Outline and references" className={`border-r border-[var(--color-border)] px-4 py-5 overflow-y-auto bg-[var(--color-surface-2)]
           min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0
           max-[1200px]:fixed max-[1200px]:top-14 max-[1200px]:bottom-0 max-[1200px]:left-0 max-[1200px]:z-50
-          max-[1200px]:w-[min(320px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200
+          max-[1200px]:w-[min(320px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200 max-[1200px]:shadow-[var(--shadow-modal)]
           ${panel === 'left' ? 'max-[1200px]:translate-x-0' : 'max-[1200px]:-translate-x-full'}`}>
           <div className="flex items-center justify-between mb-4 min-[1200px]:hidden">
             <span className="font-medium">Document tools</span>
-            <button type="button" onClick={() => setPanel(null)} aria-label="Close outline and references"
+            <button type="button" onClick={closePanel} aria-label="Close outline and references"
               className="p-2 rounded-[var(--radius)] text-[var(--color-muted)] border-none bg-transparent cursor-pointer">
               <X size={17} />
             </button>
@@ -336,17 +406,17 @@ export function EditorScreen() {
             {sections.length === 0 && <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>}
             {sections.map((s) => (
               <button key={s.id} onClick={() => goToBlock(s.id)}
-                className="text-left px-2.5 py-1.5 rounded-[var(--radius)] text-[13px] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-colors border-none bg-transparent truncate">
+                className="text-left px-2.5 py-2 rounded-[var(--radius)] text-[13px] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] transition-colors border-none bg-transparent truncate">
                 {(s as { title: string }).title || 'Untitled section'}
               </button>
             ))}
           </div>
-          <ReferencePanel documentId={id!} onCite={(ref) => { cite(ref); setPanel(null); }} refreshKey={refKey} />
+          <ReferencePanel documentId={id!} onCite={(ref) => { cite(ref); closePanel(); }} refreshKey={refKey} />
         </aside>
 
         {/* center: writing surface with reorder + insert */}
-        <section className="min-w-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 min-[1200px]:px-10 py-6 sm:py-8 bg-[var(--color-bg)]">
-          <div className="max-w-[640px] mx-auto">
+        <section className="min-w-0 overflow-y-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 min-[1200px]:px-10 py-4 sm:py-8 bg-[var(--color-bg)]">
+          <div className="max-w-[760px] min-h-[calc(100%-32px)] mx-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-paper)] px-5 py-7 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
             <FrontMatter title={docTitle} authors={authors}
               onTitle={saveTitle} onAuthors={saveAuthors} />
             {blocks.map((b, i) => (
@@ -359,8 +429,14 @@ export function EditorScreen() {
                 <div className="flex items-start gap-1 group/row">
                   <button
                     draggable onDragStart={() => setDragId(b.id)} onDragEnd={() => setDragId(null)}
-                    aria-label="Drag to reorder"
-                    className="mt-1.5 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-[var(--color-faint)] border-none bg-transparent p-0 shrink-0">
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        moveBlock(b.id, event.key === 'ArrowUp' ? -1 : 1);
+                      }
+                    }}
+                    aria-label="Reorder block. Use Arrow Up or Arrow Down."
+                    className="mt-1.5 opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-[var(--color-faint)] border-none bg-transparent p-1 shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]">
                     <GripVertical size={14} />
                   </button>
                   <div className="flex-1 min-w-0">
@@ -396,14 +472,17 @@ export function EditorScreen() {
         </section>
 
         {/* right: readiness */}
-        <aside className={`border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface)] overflow-y-auto
+        <aside id="editor-right-panel" ref={rightPanel}
+          inert={compactPanels && panel !== 'right'} aria-hidden={compactPanels && panel !== 'right'}
+          role={compactPanels && panel === 'right' ? 'dialog' : undefined} aria-modal={compactPanels && panel === 'right' ? true : undefined}
+          aria-label="Readiness and labels" className={`border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface-2)] overflow-y-auto
           min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0
           max-[1200px]:fixed max-[1200px]:top-14 max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:z-50
-          max-[1200px]:w-[min(340px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200
+          max-[1200px]:w-[min(340px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200 max-[1200px]:shadow-[var(--shadow-modal)]
           ${panel === 'right' ? 'max-[1200px]:translate-x-0' : 'max-[1200px]:translate-x-full'}`}>
           <div className="flex items-center justify-between mb-4 min-[1200px]:hidden">
             <span className="font-medium">Readiness and labels</span>
-            <button type="button" onClick={() => setPanel(null)} aria-label="Close readiness and labels"
+            <button type="button" onClick={closePanel} aria-label="Close readiness and labels"
               className="p-2 rounded-[var(--radius)] text-[var(--color-muted)] border-none bg-transparent cursor-pointer">
               <X size={17} />
             </button>
@@ -437,7 +516,7 @@ export function EditorScreen() {
                   {report.issues.map((issue) => (
                     <motion.div key={issue.id} variants={{ hidden: { opacity: 0, x: 8 }, show: { opacity: 1, x: 0 } }}
                       transition={{ duration: 0.2 }}
-                      className="border border-[var(--color-border)] rounded-[var(--radius)] p-2.5 flex gap-2 items-start justify-between bg-[var(--color-bg)]">
+                      className="border border-[var(--color-border)] rounded-[var(--radius)] p-2.5 flex gap-2 items-start justify-between bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
                       <div className="flex gap-2 items-start min-w-0">
                         <CircleAlert size={14} className="shrink-0 mt-0.5"
                           style={{ color: issue.severity === 'error' ? 'var(--status-error)' : 'var(--status-partial)' }} />
@@ -474,14 +553,14 @@ function InsertBar({ onInsert, always = false }: {
   if (always) {
     // Persistent, prominent "add content" toolbar at the end of the document.
     return (
-      <div className="mt-6 pt-4 border-t border-dashed border-[var(--color-border)]">
+      <div className="mt-8 pt-5 border-t border-dashed border-[var(--color-border-strong)]">
         <div className="text-[11px] uppercase tracking-[0.06em] text-[var(--color-faint)] font-semibold mb-2">
           Add content
         </div>
         <div className="flex gap-2 flex-wrap">
           {items.map(([type, label]) => (
             <button key={type} onClick={() => onInsert(type)}
-              className="flex items-center gap-1 text-[13px] text-[var(--color-text)] cursor-pointer border border-[var(--color-border-strong)] rounded-[var(--radius)] px-3 py-1.5 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
+              className="flex min-h-9 items-center gap-1.5 text-[13px] font-medium text-[var(--color-text)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-3 py-1.5 bg-[var(--color-surface-2)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-bg)] transition-colors">
               <span className="text-[var(--color-accent)] font-semibold">+</span> {label}
             </button>
           ))}

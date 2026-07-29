@@ -1,10 +1,10 @@
 /**
  * Cascading cross-reference picker. Top level: Figures / Tables / Equations.
- * Hovering a category opens a column of items beside it; a figure that has
- * subfigures opens a further column of its subfigures. Inserts a \ref to the
- * chosen target.
+ * Hovering, focusing, or clicking a category opens a column of items beside
+ * it; a figure that has subfigures opens a further column of its subfigures.
+ * Inserts a \ref to the chosen target.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DocumentBlock } from '../../types/document';
 import { crossRefData } from '../references/format';
 
@@ -17,6 +17,19 @@ export function RefMenu({ blocks, onPick }: {
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState<'figure' | 'table' | 'equation' | null>(null);
   const [figOpen, setFigOpen] = useState<string | null>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setOpen(false); setCat(null); setFigOpen(null);
+      trigger.current?.focus();
+    }
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
 
   const data = crossRefData(blocks);
 
@@ -52,23 +65,27 @@ export function RefMenu({ blocks, onPick }: {
     { key: 'equation' as const, label: 'Equations', items: equations },
   ]).filter((c) => c.items.length > 0);
 
-  const colCls = 'min-w-[130px] max-h-[280px] overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] py-1';
-  const itemCls = 'w-full text-left text-[12px] px-3 py-1.5 cursor-pointer border-none bg-transparent text-[var(--color-text)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] flex items-center justify-between gap-2';
+  const colCls = 'min-w-[140px] max-h-[280px] overflow-y-auto bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] p-1';
+  const itemCls = 'w-full text-left text-[12px] font-medium px-3 py-2 cursor-pointer border-none rounded-md bg-transparent text-[var(--color-text)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] flex items-center justify-between gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]';
 
   return (
     <div className="relative" onMouseLeave={() => { setOpen(false); setCat(null); setFigOpen(null); }}>
-      <button type="button" onClick={() => setOpen((v) => !v)}
-        className="text-[12px] px-2 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center gap-1">
+      <button ref={trigger} type="button" onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu" aria-expanded={open} aria-controls="editor-reference-menu"
+        className="min-h-8 text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center gap-1.5 shadow-[var(--shadow-card)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]">
         Insert \ref <span className="text-[var(--color-faint)]">▾</span>
       </button>
 
       {open && (
-        <div className="absolute z-40 top-9 left-0 flex items-start gap-1">
+        <div id="editor-reference-menu" role="menu" className="absolute z-40 top-9 left-0 flex items-start gap-1.5">
           {/* level 1: categories */}
           <div className={colCls}>
             {cats.map((c) => (
-              <button key={c.key} className={itemCls}
-                onMouseEnter={() => { setCat(c.key); setFigOpen(null); }}>
+              <button type="button" role="menuitem" key={c.key} className={itemCls}
+                aria-haspopup="menu" aria-expanded={cat === c.key}
+                onMouseEnter={() => { setCat(c.key); setFigOpen(null); }}
+                onFocus={() => { setCat(c.key); setFigOpen(null); }}
+                onClick={() => { setCat(c.key); setFigOpen(null); }}>
                 {c.label} <span className="text-[var(--color-faint)]">›</span>
               </button>
             ))}
@@ -78,8 +95,9 @@ export function RefMenu({ blocks, onPick }: {
           {cat && (
             <div className={colCls}>
               {cats.find((c) => c.key === cat)!.items.map((it) => (
-                <button key={it.id} className={itemCls}
+                <button type="button" role="menuitem" key={it.id} className={itemCls}
                   onMouseEnter={() => setFigOpen(it.subs && it.subs.length ? it.id : null)}
+                  onFocus={() => setFigOpen(it.subs && it.subs.length ? it.id : null)}
                   onClick={() => pick(it.id)}>
                   {it.label}
                   {it.subs && it.subs.length > 0 && <span className="text-[var(--color-faint)]">›</span>}
@@ -92,7 +110,7 @@ export function RefMenu({ blocks, onPick }: {
           {figOpen && (
             <div className={colCls}>
               {figures.find((f) => f.id === figOpen)?.subs?.map((s) => (
-                <button key={s.id} className={itemCls} onClick={() => pick(s.id)}>
+                <button type="button" role="menuitem" key={s.id} className={itemCls} onClick={() => pick(s.id)}>
                   {s.label}
                 </button>
               ))}

@@ -1,7 +1,7 @@
 /**
  * Cascading target-format picker for export. Top level: category
- * (Journals / Thesis / Reports / …); hovering a category opens its templates
- * in a column beside it. Click a template to select it.
+ * (Journals / Thesis / Reports / …); hover, focus, or click a category to open
+ * its templates. Click a template to select it.
  */
 import { useState } from 'react';
 import type { Template } from '../../types/compliance';
@@ -32,16 +32,20 @@ export function TargetMenu({ templates, value, onChange }: {
   return (
     <div className="relative mb-2 min-w-0" onMouseLeave={() => { setOpen(false); setCat(null); }}>
       <button type="button" onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu" aria-expanded={open} aria-controls="target-template-menu"
         className="w-full text-left text-[14px] px-3 py-2 border border-[var(--color-border-strong)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center justify-between">
         <span className="min-w-0 truncate">{selected ? selected.name : 'Choose a target…'}</span>
         <span className="text-[var(--color-faint)]">▾</span>
       </button>
 
       {open && (
-        <div className="absolute z-40 top-11 left-0 right-0 sm:right-auto flex flex-col sm:flex-row items-stretch sm:items-start gap-1">
+        <div id="target-template-menu" role="menu"
+          className="absolute z-40 top-11 left-0 right-0 sm:right-auto flex flex-col sm:flex-row items-stretch sm:items-start gap-1">
           <div className={colCls}>
             {cats.map((c) => (
-              <button key={c.type} className={itemCls} onMouseEnter={() => setCat(c.type)}>
+              <button type="button" role="menuitem" key={c.type} className={itemCls}
+                aria-haspopup="menu" aria-expanded={cat === c.type}
+                onMouseEnter={() => setCat(c.type)} onFocus={() => setCat(c.type)} onClick={() => setCat(c.type)}>
                 {c.label} <span className="text-[var(--color-faint)]">›</span>
               </button>
             ))}
@@ -49,7 +53,7 @@ export function TargetMenu({ templates, value, onChange }: {
           {cat && (
             <div className={colCls}>
               {cats.find((c) => c.type === cat)!.items.map((t) => (
-                <button key={t.id} className={itemCls}
+                <button type="button" role="menuitem" key={t.id} className={itemCls}
                   onClick={() => { onChange(t.id); setOpen(false); setCat(null); }}>
                   {t.name}
                 </button>
