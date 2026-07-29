@@ -155,12 +155,39 @@ export function buildChristThesis(doc: TemplytXDocument): string {
     else if (b.type === 'equation') { refLabels.set(b.id, `eq:${b.id.slice(0, 8)}`); refKind.set(b.id, 'equation'); }
   });
 
+  // Abstract: prefer the form field; else fall back to an "Abstract" section's
+  // following paragraphs. The Abstract section (if any) is excluded from the
+  // chapter body so it doesn't also appear as a chapter.
+  const abstractSkip = new Set<string>();
+  let abstractBody = '';
+  if (m.abstractText && m.abstractText.trim()) {
+    abstractBody = richToLatex(m.abstractText.trim(), keyMap, refLabels, refKind);
+  } else {
+    const ai = doc.blocks.findIndex((b) => b.type === 'section' && /^abstract$/i.test((b as { title: string }).title.trim()));
+    if (ai !== -1) {
+      abstractSkip.add(doc.blocks[ai].id);
+      const ps: string[] = [];
+      for (let i = ai + 1; i < doc.blocks.length; i++) {
+        const nb = doc.blocks[i];
+        if (nb.type === 'section') break;
+        abstractSkip.add(nb.id);
+        if (nb.type === 'paragraph') ps.push(richToLatex(nb.content, keyMap, refLabels, refKind));
+      }
+      abstractBody = ps.join(' ');
+    }
+  }
+  const kw = (m.keywords || '').trim();
+  const abstractTex = abstractBody
+    ? `\\abstract{\\addtocontents{toc}{\\vspace{1em}}\n${abstractBody}\n}\n${kw ? `\\textbf{\\textit{Keywords}:} ${texEscape(kw)}` : ''}\n\\clearpage`
+    : '';
+
   // Body: top-level sections become \chapter; content flows under them.
   // The first section starts the first chapter; paragraphs before any section
   // are dropped into an opening chapter "Introduction".
   const parts: string[] = [];
   let openedChapter = false;
   for (const b of doc.blocks) {
+    if (abstractSkip.has(b.id)) continue;
     if (b.type === 'section') {
       const lvl = (b as { level?: number }).level ?? 1;
       const title = texEscape((b as { title: string }).title);
@@ -231,7 +258,7 @@ ${projectVariables(m)}
 \\input{Primitives/BonafideCertificate}
 \\input{Primitives/Acknowledgments}
 \\input{Primitives/Declaration}
-\\input{Primitives/Abstract}
+${abstractTex || '\\input{Primitives/Abstract}'}
 \\tableofcontents
 \\listoffigures
 \\listoftables

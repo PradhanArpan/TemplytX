@@ -127,6 +127,7 @@ export interface ChristThesisMeta {
   weOrI: string;
   dateOfDeclaration: string;
   keywords: string;
+  abstractText?: string;
 }
 
 export interface TemplytXDocument {

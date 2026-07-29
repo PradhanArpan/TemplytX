@@ -67,6 +67,8 @@ export function EditorScreen() {
   const [refKey, setRefKey] = useState(0); // bump to refresh the left ref panel
   const [christMeta, setChristMeta] = useState<ChristThesisMeta | null>(null);
   const [showChristForm, setShowChristForm] = useState(false);
+  const [focusChapterId, setFocusChapterId] = useState<string | null>(null);
+  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const leftPanel = useRef<HTMLElement | null>(null);
@@ -344,6 +346,28 @@ export function EditorScreen() {
   }
 
   const sections = blocks.filter((b) => b.type === 'section');
+
+  // Group blocks into chapters (a level-1 section and everything under it until
+  // the next level-1 section). Used for the collapsible outline and focus mode.
+  type Chapter = { id: string; title: string; blockIds: string[]; children: { id: string; title: string; level: number }[] };
+  const chapters: Chapter[] = [];
+  for (const b of blocks) {
+    const isChapter = b.type === 'section' && ((b as { level?: number }).level ?? 1) <= 1;
+    if (isChapter) {
+      chapters.push({ id: b.id, title: (b as { title: string }).title || 'Untitled chapter', blockIds: [b.id], children: [] });
+    } else if (chapters.length > 0) {
+      const ch = chapters[chapters.length - 1];
+      ch.blockIds.push(b.id);
+      if (b.type === 'section') ch.children.push({ id: b.id, title: (b as { title: string }).title || 'Untitled', level: (b as { level?: number }).level ?? 2 });
+    }
+  }
+
+  // Which block ids are visible given focus mode. In focus mode, only the
+  // focused chapter's blocks render (plus preamble blocks like the thesis
+  // details banner stay outside this filter).
+  const focusVisibleIds: Set<string> | null = focusChapterId
+    ? new Set(chapters.find((c) => c.id === focusChapterId)?.blockIds ?? [])
+    : null;
   const score = report ? report.score : doc.readinessScore;
   const markers = markerMap(blocks, pool, tpl);
   const crossRefs = crossRefMap(blocks);
@@ -417,10 +441,48 @@ export function EditorScreen() {
               <X size={17} />
             </button>
           </div>
-          <div className={paneLabel}>Outline</div>
+          <div className="flex items-center justify-between">
+            <div className={paneLabel}>Outline</div>
+            {focusChapterId && (
+              <button onClick={() => setFocusChapterId(null)}
+                className="text-[11px] text-[var(--color-accent)] cursor-pointer border-none bg-transparent">
+                Show all
+              </button>
+            )}
+          </div>
           <div className="flex flex-col gap-0.5">
-            {sections.length === 0 && <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>}
-            {sections.map((s) => (
+            {chapters.length === 0 && sections.length === 0 && <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>}
+            {chapters.map((c) => {
+              const collapsed = collapsedChapters.has(c.id);
+              const focused = focusChapterId === c.id;
+              return (
+                <div key={c.id}>
+                  <div className={`flex items-center gap-1 rounded-[var(--radius)] ${focused ? 'bg-[var(--color-accent-bg)]' : ''}`}>
+                    {c.children.length > 0 ? (
+                      <button onClick={() => setCollapsedChapters((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })}
+                        className="text-[var(--color-faint)] hover:text-[var(--color-text)] cursor-pointer border-none bg-transparent px-1 text-[11px]"
+                        aria-label={collapsed ? 'Expand' : 'Collapse'}>
+                        {collapsed ? '▸' : '▾'}
+                      </button>
+                    ) : <span className="px-1 text-[11px] opacity-0">▸</span>}
+                    <button onClick={() => { setFocusChapterId(c.id); goToBlock(c.id); }}
+                      className={`flex-1 text-left px-1.5 py-1.5 rounded-[var(--radius)] text-[13px] font-medium cursor-pointer hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] border-none bg-transparent truncate ${focused ? 'text-[var(--color-accent)]' : 'text-[var(--color-text)]'}`}
+                      title="Click to focus this chapter">
+                      {c.title}
+                    </button>
+                  </div>
+                  {!collapsed && c.children.map((ch) => (
+                    <button key={ch.id} onClick={() => goToBlock(ch.id)}
+                      style={{ paddingLeft: 10 + (ch.level - 1) * 14 }}
+                      className="w-full text-left py-1 rounded-[var(--radius)] text-[12px] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] border-none bg-transparent truncate">
+                      {ch.title}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+            {/* sections that aren't under any chapter (e.g. non-thesis docs with only top-level sections) */}
+            {chapters.length === 0 && sections.map((s) => (
               <button key={s.id} onClick={() => goToBlock(s.id)}
                 className="text-left px-2.5 py-2 rounded-[var(--radius)] text-[13px] text-[var(--color-muted)] cursor-pointer hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] transition-colors border-none bg-transparent truncate">
                 {(s as { title: string }).title || 'Untitled section'}
@@ -448,7 +510,19 @@ export function EditorScreen() {
                 </button>
               </div>
             )}
+            {focusChapterId && (
+              <div className="mb-4 flex items-center justify-between gap-2 p-2.5 rounded-[var(--radius)] bg-[var(--color-surface-2)] border border-[var(--color-border)]">
+                <span className="text-[13px] text-[var(--color-muted)]">
+                  Focused on <b className="text-[var(--color-text)]">{chapters.find((c) => c.id === focusChapterId)?.title || 'chapter'}</b> — editing one chapter at a time.
+                </span>
+                <button onClick={() => setFocusChapterId(null)}
+                  className="text-[12px] px-2.5 py-1 rounded-[var(--radius)] bg-[var(--color-accent)] text-white cursor-pointer border-none shrink-0">
+                  Show whole document
+                </button>
+              </div>
+            )}
             {blocks.map((b, i) => (
+              focusVisibleIds && !focusVisibleIds.has(b.id) ? null : (
               <div key={b.id}
                 onDragOver={(e) => { if (dragId) e.preventDefault(); }}
                 onDrop={() => onDrop(b.id)}
@@ -477,6 +551,7 @@ export function EditorScreen() {
                   </div>
                 </div>
               </div>
+              )
             ))}
 
             <InsertBar onInsert={(t) => insertBlock(t)} always />

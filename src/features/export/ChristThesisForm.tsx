@@ -14,7 +14,7 @@ export const emptyChristMeta = (): ChristThesisMeta => ({
   coGuideName: '', coGuideDesignation: '', coGuideDepartment: '',
   departmentName: 'Department of Civil Engineering', collegeName: 'School of Engineering and Technology',
   hodName: '', hodDesignation: 'Head of the Department',
-  projectDate: '', academicYear: '', weOrI: 'I', dateOfDeclaration: '', keywords: '',
+  projectDate: '', academicYear: '', weOrI: 'I', dateOfDeclaration: '', keywords: '', abstractText: '',
 });
 
 export function ChristThesisForm({ meta, onChange }: {
@@ -79,6 +79,10 @@ export function ChristThesisForm({ meta, onChange }: {
         <div><label className={lbl}>Declaration date</label><input className={fld} value={meta.dateOfDeclaration} onChange={(e) => set({ dateOfDeclaration: e.target.value })} placeholder="15-03-2026" /></div>
         <div><label className={lbl}>Keywords</label><input className={fld} value={meta.keywords} onChange={(e) => set({ keywords: e.target.value })} /></div>
       </div>
+      <label className={lbl}>Abstract (leave blank to use an "Abstract" section from your document)</label>
+      <textarea className={`${fld} min-h-[90px] resize-y`} value={meta.abstractText ?? ''}
+        onChange={(e) => set({ abstractText: e.target.value })}
+        placeholder="Your thesis abstract…" />
     </div>
   );
 }
