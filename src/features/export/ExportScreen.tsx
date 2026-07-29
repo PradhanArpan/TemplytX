@@ -32,6 +32,7 @@ export function ExportScreen() {
   const [latexMode, setLatexMode] = useState<'submission' | 'cameraready'>('submission');
   const [customClass, setCustomClass] = useState('');
   const [christMeta, setChristMeta] = useState(emptyChristMeta());
+  const [christLoaded, setChristLoaded] = useState(false);
   const [includeAuthors, setIncludeAuthors] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -40,6 +41,7 @@ export function ExportScreen() {
     getDocument(id).then((d) => {
       setDoc(d);
       setTargetId(d?.targetTemplateId ?? 'tpl-ieee');
+      if (d?.christThesis && !christLoaded) { setChristMeta(d.christThesis); setChristLoaded(true); }
     });
     listTemplates().then(setTemplates);
   }, [id]);

@@ -18,6 +18,8 @@ import { BlockView } from './blocks/BlockView';
 import { EditorToolbar } from './EditorToolbar';
 import { RefMenu } from './RefMenu';
 import { FrontMatter } from './FrontMatter';
+import { ChristThesisForm, emptyChristMeta } from '../export/ChristThesisForm';
+import type { ChristThesisMeta } from '../../types/document';
 import type { Author } from '../../types/document';
 
 const paneLabel =
@@ -63,6 +65,8 @@ export function EditorScreen() {
   const [panel, setPanel] = useState<'left' | 'right' | null>(null);
   const [compactPanels, setCompactPanels] = useState(() => window.matchMedia('(max-width: 1199px)').matches);
   const [refKey, setRefKey] = useState(0); // bump to refresh the left ref panel
+  const [christMeta, setChristMeta] = useState<ChristThesisMeta | null>(null);
+  const [showChristForm, setShowChristForm] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const leftPanel = useRef<HTMLElement | null>(null);
@@ -144,10 +148,17 @@ export function EditorScreen() {
       setBlocks(d?.blocks ?? []);
       setAuthors(d?.authors ?? []);
       setDocTitle(d?.title ?? '');
+      setChristMeta(d?.christThesis ?? null);
       if (d?.targetTemplateId) listTemplates().then((ts) =>
         setTpl(ts.find((t) => t.id === d.targetTemplateId) ?? null));
     });
     listReferences().then(setPool);
+  }, [id]);
+
+  const saveChristMeta = useCallback((m: ChristThesisMeta) => {
+    setChristMeta(m);
+    setSaved(false);
+    if (id) updateDocument(id, { christThesis: m }).then(() => setSaved(true));
   }, [id]);
 
   const applyBlocks = useCallback((next: DocumentBlock[]) => {
@@ -419,6 +430,17 @@ export function EditorScreen() {
           <div className="max-w-[760px] min-h-[calc(100%-32px)] mx-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-paper)] px-5 py-7 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
             <FrontMatter title={docTitle} authors={authors}
               onTitle={saveTitle} onAuthors={saveAuthors} />
+            {tpl?.id === 'tpl-christ-thesis' && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap p-2.5 rounded-[var(--radius)] bg-[var(--color-accent-bg)] border border-[var(--color-accent)]/30">
+                <span className="text-[13px] text-[var(--color-text)]">
+                  CHRIST thesis details {christMeta?.projectTitle ? '✓ set' : '— not set yet'}
+                </span>
+                <button onClick={() => { if (!christMeta) setChristMeta(emptyChristMeta()); setShowChristForm(true); }}
+                  className="text-[12px] px-2.5 py-1 rounded-[var(--radius)] bg-[var(--color-accent)] text-white cursor-pointer border-none">
+                  {christMeta?.projectTitle ? 'Edit thesis details' : 'Set up thesis details'}
+                </button>
+              </div>
+            )}
             {blocks.map((b, i) => (
               <div key={b.id}
                 onDragOver={(e) => { if (dragId) e.preventDefault(); }}
@@ -538,6 +560,24 @@ export function EditorScreen() {
           <LabelsPanel documentId={id!} onPulled={() => setRefKey((k) => k + 1)} />
         </aside>
       </div>
+
+      {showChristForm && christMeta && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto py-8"
+          onClick={() => setShowChristForm(false)}>
+          <div className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] max-w-[560px] w-full mx-4 p-4"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[15px] font-semibold text-[var(--color-text)]">CHRIST Thesis details</h3>
+              <button onClick={() => setShowChristForm(false)} className="text-[var(--color-faint)] hover:text-[var(--color-text)] cursor-pointer border-none bg-transparent text-lg">×</button>
+            </div>
+            <ChristThesisForm meta={christMeta} onChange={saveChristMeta} />
+            <div className="flex justify-end mt-2">
+              <button onClick={() => setShowChristForm(false)}
+                className="text-[13px] px-4 py-2 rounded-[var(--radius)] bg-[var(--color-accent)] text-white cursor-pointer border-none">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

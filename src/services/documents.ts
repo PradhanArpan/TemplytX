@@ -28,6 +28,7 @@ function rowToDoc(r: Record<string, unknown>): TemplytXDocument {
     readinessScore: (r.readiness_score as number) ?? null,
     blocks: (r.blocks as TemplytXDocument['blocks']) ?? [],
     references: (r.doc_references as TemplytXDocument['references']) ?? [],
+    christThesis: (r.christ_thesis as TemplytXDocument['christThesis']) ?? undefined,
     createdAt: (r.created_at as string) ?? now(),
     updatedAt: (r.updated_at as string) ?? now(),
   };
@@ -92,6 +93,7 @@ export async function updateDocument(
   if (patch.readinessScore !== undefined) row.readiness_score = patch.readinessScore;
   if (patch.blocks !== undefined) row.blocks = patch.blocks;
   if (patch.references !== undefined) row.doc_references = patch.references;
+  if (patch.christThesis !== undefined) row.christ_thesis = patch.christThesis;
   const { data, error } = await supabase.from('documents').update(row).eq('id', id).select('*').single();
   if (error) throw error;
   return rowToDoc(data);
