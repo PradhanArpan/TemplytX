@@ -132,6 +132,8 @@ export interface ChristThesisMeta {
   departmentMission?: string;
   departmentPEOs?: string;
   departmentPSOs?: string;
+  glossary?: { term: string; description: string }[];
+  publications?: string;
 }
 
 export interface TemplytXDocument {

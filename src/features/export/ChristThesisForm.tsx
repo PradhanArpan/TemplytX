@@ -16,6 +16,7 @@ export const emptyChristMeta = (): ChristThesisMeta => ({
   hodName: '', hodDesignation: 'Head of the Department',
   projectDate: '', academicYear: '', weOrI: 'I', dateOfDeclaration: '', keywords: '', abstractText: '',
   departmentVision: '', departmentMission: '', departmentPEOs: '', departmentPSOs: '',
+  glossary: [], publications: '',
 });
 
 export function ChristThesisForm({ meta, onChange }: {
@@ -93,6 +94,25 @@ export function ChristThesisForm({ meta, onChange }: {
       <textarea className={`${fld} min-h-[50px] resize-y`} value={meta.departmentPEOs ?? ''} onChange={(e) => set({ departmentPEOs: e.target.value })} />
       <label className={lbl}>Program Specific Outcomes (PSOs)</label>
       <textarea className={`${fld} min-h-[50px] resize-y`} value={meta.departmentPSOs ?? ''} onChange={(e) => set({ departmentPSOs: e.target.value })} />
+
+      <div className="text-[12px] font-medium text-[var(--color-text)] mt-2 mb-1">Glossary (optional)</div>
+      {(meta.glossary ?? []).map((g, i) => (
+        <div key={i} className="flex gap-1 mb-1 items-start">
+          <input className={`${fld} mb-0 w-28`} value={g.term} placeholder="Term"
+            onChange={(e) => set({ glossary: (meta.glossary ?? []).map((x, xi) => xi === i ? { ...x, term: e.target.value } : x) })} />
+          <input className={`${fld} mb-0`} value={g.description} placeholder="Description"
+            onChange={(e) => set({ glossary: (meta.glossary ?? []).map((x, xi) => xi === i ? { ...x, description: e.target.value } : x) })} />
+          <button onClick={() => set({ glossary: (meta.glossary ?? []).filter((_, xi) => xi !== i) })}
+            className="text-[var(--color-faint)] hover:text-[var(--status-error)] px-1 cursor-pointer border-none bg-transparent">×</button>
+        </div>
+      ))}
+      <button onClick={() => set({ glossary: [...(meta.glossary ?? []), { term: '', description: '' }] })}
+        className="text-[11px] text-[var(--color-accent)] cursor-pointer border-none bg-transparent mb-2">+ Add glossary term</button>
+
+      <label className={lbl}>Publications (one per line)</label>
+      <textarea className={`${fld} min-h-[70px] resize-y`} value={meta.publications ?? ''}
+        onChange={(e) => set({ publications: e.target.value })}
+        placeholder="Author, Title, Journal, Year…" />
     </div>
   );
 }

@@ -105,7 +105,7 @@ ${authorCmds}
 \\newcommand{\\CoGuideDesignation}{${texEscape(m.coGuideDesignation)}}
 \\newcommand{\\CoGuideDepartment}{${texEscape(m.coGuideDepartment)}}
 \\newcommand{\\NameofAuthortobeCertified}{${texEscape(m.authors[0]?.name || '')}}
-\\newcommand{\\DepartmentNameAddress}{\\textbf{\\large{${texEscape(m.departmentName)}\\\\ \\CollegeName, \\\\ \\UniversityName,\\\\ Kumbalagudu,\\,Bengaluru\\,-\\,560~074}}}
+\\newcommand{\\DepartmentNameAddress}{\\textbf{\\large{${texEscape(m.departmentName)}\\\\ \\CollegeName, \\\\ \\UniversityName,\\\\ Kumbalagudu,\\,Bengaluru\\,-\\,560~074\\\\[0.25in]}}}
 \\newcommand{\\ProjectDate}{${texEscape(m.projectDate)}}
 \\newcommand{\\AcademicYear}{${texEscape(m.academicYear)}}
 \\newcommand{\\DepartmentName}{${texEscape(m.departmentName)}}
@@ -180,6 +180,29 @@ export function buildChristThesis(doc: TemplytXDocument): string {
   const abstractTex = abstractBody
     ? `\\abstract{\\addtocontents{toc}{\\vspace{1em}}\n${abstractBody}\n}\n${kw ? `\\textbf{\\textit{Keywords}:} ${texEscape(kw)}` : ''}\n\\clearpage`
     : '';
+
+  // Glossary from form entries (falls back to an empty list, not template junk).
+  const glossaryRows = (m.glossary ?? []).filter((g) => g.term.trim() || g.description.trim());
+  const glossaryTex = `\\clearpage
+\\glossarylist{
+\\setstretch{1.5}
+\\begin{tabular}{lp{11cm}}
+\\hline
+\\textbf{Item} & \\textbf{Description}\\\\
+\\hline
+${glossaryRows.map((g) => `\\textbf{${texEscape(g.term)}} & ${texEscape(g.description)} \\\\`).join('\n')}
+\\hline
+\\end{tabular}
+}`;
+
+  // Publications from a free-text field (one per line -> enumerated).
+  const pubLines = (m.publications ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const publicationsTex = `\\clearpage
+\\publicationlist{
+\\justify
+${pubLines.length ? `\\begin{enumerate}\n${pubLines.map((l) => `\\item ${texEscape(l)}`).join('\n')}\n\\end{enumerate}` : ''}
+}
+\\pagebreak`;
 
   // Body: top-level sections become \chapter; content flows under them.
   // The first section starts the first chapter; paragraphs before any section
@@ -279,7 +302,7 @@ ${projectVariables(m)}
 \\input{Primitives/Acknowledgments}
 \\input{Primitives/Declaration}
 ${abstractTex || '\\input{Primitives/Abstract}'}
-\\input{Primitives/Glossary}
+${glossaryTex}
 \\tableofcontents
 \\listoffigures
 \\listoftables
@@ -287,7 +310,7 @@ ${abstractTex || '\\input{Primitives/Abstract}'}
 \\pagestyle{fancy}
 ${chapters}
 ${bib}
-\\input{Chapters/PublicationsDetails}
+${publicationsTex}
 \\appendix
 \\input{Appendices/AppendixA}
 \\input{Appendices/AppendixB}
