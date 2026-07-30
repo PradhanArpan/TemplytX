@@ -128,6 +128,10 @@ export interface ChristThesisMeta {
   dateOfDeclaration: string;
   keywords: string;
   abstractText?: string;
+  departmentVision?: string;
+  departmentMission?: string;
+  departmentPEOs?: string;
+  departmentPSOs?: string;
 }
 
 export interface TemplytXDocument {

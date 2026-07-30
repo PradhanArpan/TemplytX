@@ -15,6 +15,7 @@ export const emptyChristMeta = (): ChristThesisMeta => ({
   departmentName: 'Department of Civil Engineering', collegeName: 'School of Engineering and Technology',
   hodName: '', hodDesignation: 'Head of the Department',
   projectDate: '', academicYear: '', weOrI: 'I', dateOfDeclaration: '', keywords: '', abstractText: '',
+  departmentVision: '', departmentMission: '', departmentPEOs: '', departmentPSOs: '',
 });
 
 export function ChristThesisForm({ meta, onChange }: {
@@ -83,6 +84,15 @@ export function ChristThesisForm({ meta, onChange }: {
       <textarea className={`${fld} min-h-[90px] resize-y`} value={meta.abstractText ?? ''}
         onChange={(e) => set({ abstractText: e.target.value })}
         placeholder="Your thesis abstract…" />
+      <div className="text-[12px] font-medium text-[var(--color-text)] mt-2 mb-1">Department (for Vision/Mission pages)</div>
+      <label className={lbl}>Department Vision</label>
+      <textarea className={`${fld} min-h-[50px] resize-y`} value={meta.departmentVision ?? ''} onChange={(e) => set({ departmentVision: e.target.value })} />
+      <label className={lbl}>Department Mission</label>
+      <textarea className={`${fld} min-h-[50px] resize-y`} value={meta.departmentMission ?? ''} onChange={(e) => set({ departmentMission: e.target.value })} />
+      <label className={lbl}>Program Educational Objectives (PEOs)</label>
+      <textarea className={`${fld} min-h-[50px] resize-y`} value={meta.departmentPEOs ?? ''} onChange={(e) => set({ departmentPEOs: e.target.value })} />
+      <label className={lbl}>Program Specific Outcomes (PSOs)</label>
+      <textarea className={`${fld} min-h-[50px] resize-y`} value={meta.departmentPSOs ?? ''} onChange={(e) => set({ departmentPSOs: e.target.value })} />
     </div>
   );
 }
