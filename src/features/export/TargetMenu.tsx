@@ -8,9 +8,9 @@ import type { Template } from '../../types/compliance';
 
 const LABELS: Record<string, string> = {
   journal: 'Journals', thesis: 'Thesis', report: 'Reports',
-  proposal: 'Proposals', 'lab-report': 'Lab Reports', cv: 'Academic CV',
+  proposal: 'Proposals', 'lab-report': 'Lab Reports', cv: 'Academic CV', project: 'Projects',
 };
-const ORDER = ['journal', 'thesis', 'report', 'proposal', 'lab-report', 'cv'];
+const ORDER = ['journal', 'thesis', 'report', 'proposal', 'lab-report', 'cv', 'project'];
 
 export function TargetMenu({ templates, value, onChange }: {
   templates: Template[];

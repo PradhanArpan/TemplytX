@@ -172,6 +172,15 @@ export const templateCatalog: Template[] = [
     ],
     isActive: true,
   },
+  {
+    id: 'tpl-kmea', name: 'KMEA Report', publisher: 'Karnataka Monitoring & Evaluation Authority', type: 'project',
+    scope: 'admin-global', citationStyle: 'ieee',
+    citationOrder: 'sequence',
+    sections: [S('Introduction')],
+    formatting: { paperSize: 'a4', columns: 1, lineSpacing: 'onehalf', bodyFont: 'Times New Roman', bodyFontPt: 12, numberSections: true },
+    rules: [{ ruleId: 'required-sections', severity: 'warning' }],
+    isActive: true,
+  },
 ];
 
 /** Required section titles for a template — fed to the required-sections rule. */
