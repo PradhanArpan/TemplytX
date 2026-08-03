@@ -48,6 +48,7 @@ export function ExportScreen() {
 
   const tpl = templates.find((t) => t.id === targetId) ?? null;
   const isChristThesis = tpl?.id === 'tpl-christ-thesis';
+  const isKmea = tpl?.id === 'tpl-kmea';
 
   // Live compliance against the CHOSEN export target (not the doc's stored one).
   const report = doc && tpl ? runCompliance({
@@ -76,6 +77,9 @@ export function ExportScreen() {
         if (isChristThesis) {
           const { buildChristThesis } = await import('./exportChristThesis');
           tex = buildChristThesis({ ...docForExport, christThesis: christMeta });
+        } else if (isKmea) {
+          const { buildKmea } = await import('./exportKmea');
+          tex = buildKmea(docForExport);
         } else {
           const { buildLatex } = await import('./exportLatex');
           tex = buildLatex(docForExport, tpl, latexMode, customClass);
@@ -91,6 +95,9 @@ export function ExportScreen() {
         if (isChristThesis) {
           const { buildChristThesis } = await import('./exportChristThesis');
           tex = buildChristThesis({ ...docForExport, christThesis: christMeta });
+        } else if (isKmea) {
+          const { buildKmea } = await import('./exportKmea');
+          tex = buildKmea(docForExport);
         } else {
           const { buildLatex } = await import('./exportLatex');
           tex = buildLatex(docForExport, tpl, latexMode, customClass);
