@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileText, Plus, Upload, Trash2 } from 'lucide-react';
-import { listDocuments, createDocument, listTemplates, deleteDocument } from '../../services/documents';
+import { listDocuments, createDocument, listTemplates, deleteDocument, updateDocument } from '../../services/documents';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
@@ -45,6 +45,33 @@ export function DashboardScreen() {
     navigate(`/doc/${doc.id}`);
   }
 
+  const [importing, setImporting] = useState(false);
+  async function handleImportFile(file: File) {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      // Accept either a bare blocks array or { title, targetTemplateId, blocks }.
+      const blocks = Array.isArray(data) ? data : data.blocks;
+      if (!Array.isArray(blocks)) throw new Error('File must contain a blocks array.');
+      const importTitle = (Array.isArray(data) ? '' : data.title) || file.name.replace(/\.json$/i, '');
+      const targetId = (Array.isArray(data) ? null : data.targetTemplateId) ?? null;
+      const doc = await createDocument({ title: importTitle, targetTemplateId: targetId });
+      // Save blocks in chunks so very large imports don't send one huge request.
+      const CHUNK = 300;
+      let acc: unknown[] = [];
+      for (let i = 0; i < blocks.length; i += CHUNK) {
+        acc = acc.concat(blocks.slice(i, i + CHUNK));
+        await updateDocument(doc.id, { blocks: acc as never });
+      }
+      navigate(`/doc/${doc.id}`);
+    } catch (e) {
+      alert('Import failed: ' + (e instanceof Error ? e.message : 'invalid file'));
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const inputCls =
     'text-[14px] min-h-11 px-3.5 py-2.5 border border-[var(--color-border-strong)] rounded-[var(--radius)] ' +
     'bg-[var(--color-surface)] text-[var(--color-text)] outline-none ' +
@@ -72,6 +99,13 @@ export function DashboardScreen() {
           <Button variant="secondary" className="w-full min-[400px]:flex-1 sm:w-auto sm:flex-none whitespace-nowrap" onClick={() => navigate('/templates/upload')}>
             <Upload size={15} /> Upload template
           </Button>
+          <label className="w-full min-[400px]:flex-1 sm:w-auto sm:flex-none">
+            <input type="file" accept="application/json,.json" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ''; }} />
+            <span className="inline-flex items-center justify-center gap-2 w-full whitespace-nowrap text-[14px] min-h-11 px-4 rounded-[var(--radius)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer hover:border-[var(--color-accent)]">
+              <Upload size={15} /> {importing ? 'Importing…' : 'Import document'}
+            </span>
+          </label>
           <Button variant={creating ? 'secondary' : 'primary'} className="w-full min-[400px]:flex-1 sm:w-auto sm:flex-none whitespace-nowrap"
             aria-expanded={creating} aria-controls="create-document-panel" onClick={() => setCreating((v) => !v)}>
             {creating ? 'Cancel' : <><Plus size={15} /> New document</>}
