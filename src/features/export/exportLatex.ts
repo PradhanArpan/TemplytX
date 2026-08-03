@@ -38,6 +38,9 @@ const UNICODE_MAP: Record<string, string> = {
   '→': '\\rightarrow', '←': '\\leftarrow', '↔': '\\leftrightarrow',
   '°': '\\textdegree{}', '·': '\\cdot', '′': "'", '″': "''",
   '–': '--', '—': '---', '“': '``', '”': "''", '‘': '`', '’': "'",
+  '₹': '\\rupee{}', '€': '\\texteuro{}', '£': '\\pounds{}', '¥': '\\textyen{}',
+  '•': '\\textbullet{}', '…': '\\ldots{}', '™': '\\texttrademark{}', '©': '\\textcopyright{}',
+  '®': '\\textregistered{}', '½': '\\textonehalf{}', '¼': '\\textonequarter{}', '¾': '\\textthreequarters{}',
 };
 
 /** Replace Unicode symbols with LaTeX (Greek/math wrapped in math mode). */
@@ -256,6 +259,7 @@ ${refList.map((r) => {
   const pkgs = [
     '\\usepackage[T1]{fontenc}',
     '\\usepackage{textcomp}',
+    '\\IfFileExists{tfrupee.sty}{\\usepackage{tfrupee}}{\\providecommand{\\rupee}{Rs.}}',
     '\\usepackage{amsmath,amssymb}',
     usesGraphics ? '\\usepackage{graphicx}' : '',
     usesSubfig ? '\\usepackage{subcaption}' : '',
