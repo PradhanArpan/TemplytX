@@ -8,6 +8,7 @@
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { orderedReferences } from '../references/format';
+import { formatTable } from './formatTable';
 import { listReferencesSync } from '../../services/references';
 
 const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
@@ -209,23 +210,11 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
       }
       case 'table': {
         const lbl = refLabels.get(b.id);
-        const cap = texEscape(b.caption || '');
-        const cols = b.rows[0]?.length ?? 1;
-        const align = (b.align ?? Array(cols).fill('left')).map((a) =>
-          a === 'center' ? 'c' : a === 'right' ? 'r' : 'l');
-        const colspec = b.colLines ? '|' + align.join('|') + '|' : align.join('');
-        const rowsTex = b.rows.map((row, ri) => {
-          const cells = row.map((c) => texEscape(c)).join(' & ');
-          let line = `    ${cells} \\\\`;
-          if (ri === 0 && b.headerRule) line += '\n    \\midrule';
-          else if (b.rowLines && ri < b.rows.length - 1) line += '\n    \\hline';
-          return line;
-        }).join('\n');
-        const top = b.topRule ? '    \\toprule\n' : '';
-        const bottom = b.bottomRule ? '\n    \\bottomrule' : '';
-        // Tables with several columns span both columns in two-column layouts.
-        const env = (twoCol && cols >= 3) ? 'table*' : 'table';
-        return `\\begin{${env}}[htbp]\n  \\centering\n  \\caption{${cap}}\\label{${lbl}}\n  \\begin{tabular}{${colspec}}\n${top}${rowsTex}${bottom}\n  \\end{tabular}\n\\end{${env}}`;
+        // Wide tables span both columns in two-column journal layouts.
+        return formatTable(b, {
+          label: lbl, esc: texEscape,
+          wideFloat: twoCol && (b.rows[0]?.length ?? 1) >= 3,
+        });
       }
       default: return '';
     }
@@ -251,7 +240,10 @@ ${refList.map((r) => {
 
   const usesSubfig = doc.blocks.some((b) => b.type === 'figure' && (b.subfigures?.length ?? 0) > 0);
   const usesGraphics = doc.blocks.some((b) => b.type === 'figure');
-  const usesBooktabs = doc.blocks.some((b) => b.type === 'table' && (b.topRule || b.bottomRule || b.headerRule));
+  const usesTables = doc.blocks.some((b) => b.type === 'table');
+  const tablePkgs = usesTables
+    ? '\\usepackage{booktabs}\n\\usepackage{tabularx}\n\\usepackage{array}\n\\usepackage{pdflscape}'
+    : '';
   // Springer/Elsevier classes bundle their own citation handling; loading the
   // `cite` package on top breaks \cite (the \@citex error). Only IEEE/article
   // need it.
@@ -263,7 +255,7 @@ ${refList.map((r) => {
     '\\usepackage{amsmath,amssymb}',
     usesGraphics ? '\\usepackage{graphicx}' : '',
     usesSubfig ? '\\usepackage{subcaption}' : '',
-    usesBooktabs ? '\\usepackage{booktabs}' : '',
+    tablePkgs,
     wantsCitePkg ? '\\usepackage{cite}' : '',
   ].filter(Boolean).join('\n');
 
@@ -281,7 +273,7 @@ ${refList.map((r) => {
       '\\usepackage{amsmath,amssymb}',
       usesGraphics ? '\\usepackage{graphicx}' : '',
       usesSubfig ? '\\usepackage{subcaption}' : '',
-      usesBooktabs ? '\\usepackage{booktabs}' : '',
+      tablePkgs,
     ].filter(Boolean).join('\n');
     return `\\documentclass{${cls}}
 ${genericPkgs}

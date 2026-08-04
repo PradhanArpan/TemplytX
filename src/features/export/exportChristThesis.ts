@@ -15,6 +15,7 @@
 import type { TemplytXDocument, ChristThesisMeta } from '../../types/document';
 
 import { orderedReferences } from '../references/format';
+import { formatTable } from './formatTable';
 import { listReferencesSync } from '../../services/references';
 
 // Reuse the shared LaTeX helpers by importing from exportLatex via a light copy.
@@ -233,18 +234,7 @@ ${pubLines.length ? `\\begin{enumerate}\n${pubLines.map((l) => `\\item ${texEsca
       const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
       parts.push(`\\begin{figure}[htbp]\n\\centering\n${localImg(b.src, `${width}\\linewidth`)}\n\\caption{${cap}}\\label{${lbl}}\n\\end{figure}`);
     } else if (b.type === 'table') {
-      const lbl = refLabels.get(b.id);
-      const cap = texEscape(b.caption || '');
-      const cols = b.rows[0]?.length ?? 1;
-      const align = (b.align ?? Array(cols).fill('left')).map((a) => a === 'center' ? 'c' : a === 'right' ? 'r' : 'l').join('');
-      const rows = b.rows.map((r, ri) => {
-        let line = '    ' + r.map((c) => texEscape(c)).join(' & ') + ' \\\\';
-        if (ri === 0 && b.headerRule) line += '\n    \\midrule';
-        return line;
-      }).join('\n');
-      const top = b.topRule ? '    \\toprule\n' : '';
-      const bottom = b.bottomRule ? '\n    \\bottomrule' : '';
-      parts.push(`\\begin{table}[htbp]\n\\centering\n\\caption{${cap}}\\label{${lbl}}\n\\begin{tabular}{${align}}\n${top}${rows}${bottom}\n\\end{tabular}\n\\end{table}`);
+      parts.push(formatTable(b, { label: refLabels.get(b.id), esc: texEscape }));
     }
   }
   const body = parts.join('\n\n');
@@ -270,6 +260,7 @@ ${refList.map((r) => {
 \\hypersetup{urlcolor=blue, colorlinks=true}
 \\title{\\ttitle}
 \\usepackage{mathptmx, imakeidx, hyperref, listings, color, textcomp, algorithm, pdfpages, setspace, datetime, ragged2e, enumitem, booktabs, graphicx, amsmath, amssymb, subcaption}
+\\usepackage{tabularx, array, pdflscape}
 \\IfFileExists{tfrupee.sty}{\\usepackage{tfrupee}}{\\providecommand{\\rupee}{Rs.}}
 \\IfFileExists{lmodern.sty}{\\usepackage{lmodern}}{}
 \\usepackage{tikz, lipsum}

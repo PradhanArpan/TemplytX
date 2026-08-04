@@ -10,6 +10,7 @@
  */
 import type { TemplytXDocument } from '../../types/document';
 import { orderedReferences } from '../references/format';
+import { formatTable } from './formatTable';
 import { listReferencesSync } from '../../services/references';
 
 const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
@@ -100,41 +101,7 @@ export function buildKmea(doc: TemplytXDocument): string {
       const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
       parts.push(`\\begin{figure}[htbp]\n\\centering\n${localImg(b.src, `${width}\\linewidth`)}\n\\caption{${cap}}\\label{${refLabels.get(b.id)}}\n\\end{figure}`);
     } else if (b.type === 'table') {
-      const cap = texEscape(b.caption || '');
-      const cols = b.rows[0]?.length ?? 1;
-      const alignCh = (i: number) => {
-        const a = (b.align ?? [])[i];
-        return a === 'center' ? 'c' : a === 'right' ? 'r' : 'l';
-      };
-      // Bold the header row (first row); wrap other cells.
-      const bodyRows = b.rows.map((r, ri) => {
-        const cells = r.map((c) => ri === 0 ? `\\textbf{${texEscape(c)}}` : texEscape(c));
-        let line = '    ' + cells.join(' & ') + ' \\\\';
-        if (ri === 0) line += '\n    \\midrule';
-        return line;
-      }).join('\n');
-
-      // Column spec: for wider tables use tabularx (auto-fits \textwidth,
-      // wraps long cells). Narrow tables use plain l/c/r so they don't stretch.
-      let colspec: string, wrap = false;
-      if (cols >= 3) {
-        wrap = true;
-        colspec = Array.from({ length: cols }, (_, i) => {
-          const a = alignCh(i);
-          return a === 'c' ? '>{\\centering\\arraybackslash}X'
-            : a === 'r' ? '>{\\raggedleft\\arraybackslash}X' : 'X';
-        }).join('');
-      } else {
-        colspec = Array.from({ length: cols }, (_, i) => alignCh(i)).join('');
-      }
-
-      const veryWide = cols >= 6;
-      const openTable = veryWide ? '\\begin{table}[htbp]\n\\centering\n\\begin{landscape}' : '\\begin{table}[htbp]\n\\centering';
-      const closeTable = veryWide ? '\\end{landscape}\n\\end{table}' : '\\end{table}';
-      const tbl = wrap
-        ? `\\begin{tabularx}{\\textwidth}{${colspec}}\n    \\toprule\n${bodyRows}\n    \\bottomrule\n\\end{tabularx}`
-        : `\\begin{tabular}{${colspec}}\n    \\toprule\n${bodyRows}\n    \\bottomrule\n\\end{tabular}`;
-      parts.push(`${openTable}\n\\caption{${cap}}\\label{${refLabels.get(b.id)}}\n${tbl}\n${closeTable}`);
+      parts.push(formatTable(b, { label: refLabels.get(b.id), esc: texEscape }));
     }
   }
   const body = parts.join('\n\n') || '\\chapter{Introduction}\n';
