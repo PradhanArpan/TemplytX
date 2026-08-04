@@ -4,7 +4,8 @@
  * currently focused rich-text block. Because execCommand acts on the live
  * selection, this works for whichever paragraph the caret is in.
  */
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bold, Italic, Superscript, Subscript, Sigma } from 'lucide-react';
 import { insertIntoActiveField } from './activeField';
 
@@ -15,6 +16,18 @@ const SYMBOLS = [
 
 export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
   const [showSymbols, setShowSymbols] = useState(false);
+  const symBtnRef = useRef<HTMLButtonElement>(null);
+  const [symPos, setSymPos] = useState<{ top: number; left: number } | null>(null);
+  function toggleSymbols() {
+    setShowSymbols((s) => {
+      const next = !s;
+      if (next && symBtnRef.current) {
+        const r = symBtnRef.current.getBoundingClientRect();
+        setSymPos({ top: r.bottom + 4, left: r.left });
+      }
+      return next;
+    });
+  }
 
   function run(cmd: string) {
     document.execCommand(cmd, false);
@@ -54,12 +67,13 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
       <button type="button" aria-label="Subscript" onMouseDown={(e) => { e.preventDefault(); runScript('subscript'); }}
         onClick={(e) => { if (e.detail === 0) runScript('subscript'); }} className={btn} title="Subscript (toggle)"><Subscript size={15} /></button>
       <div className="relative">
-        <button type="button" aria-label="Insert symbol" aria-haspopup="menu" aria-expanded={showSymbols} aria-controls="editor-symbol-menu"
-          onMouseDown={(e) => { e.preventDefault(); setShowSymbols((s) => !s); }}
-          onClick={(e) => { if (e.detail === 0) setShowSymbols((s) => !s); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
-        {showSymbols && (
+        <button ref={symBtnRef} type="button" aria-label="Insert symbol" aria-haspopup="menu" aria-expanded={showSymbols} aria-controls="editor-symbol-menu"
+          onMouseDown={(e) => { e.preventDefault(); toggleSymbols(); }}
+          onClick={(e) => { if (e.detail === 0) toggleSymbols(); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
+        {showSymbols && symPos && createPortal(
           <div id="editor-symbol-menu" role="menu" aria-label="Symbols"
-            className="absolute z-[100] top-9 left-0 w-[256px] p-2.5 bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-1">
+            style={{ position: 'fixed', top: symPos.top, left: symPos.left, zIndex: 1000 }}
+            className="w-[256px] p-2.5 bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-1">
             {SYMBOLS.map((s) => (
               <button key={s} type="button" role="menuitem" aria-label={`Insert ${s}`}
                 onMouseDown={(e) => { e.preventDefault(); insertSymbol(s); }}
@@ -68,7 +82,8 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
                 {s}
               </button>
             ))}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

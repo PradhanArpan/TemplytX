@@ -4,6 +4,7 @@
  * Equations render live with KaTeX (click to edit, blur to render).
  */
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { RichParagraph } from './RichParagraph';
@@ -99,6 +100,18 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
   const [draft, setDraft] = useState(block.latex);
   const [focused, setFocused] = useState(false);
   const [showGreek, setShowGreek] = useState(false);
+  const greekBtnRef = useRef<HTMLButtonElement>(null);
+  const [greekPos, setGreekPos] = useState<{ top: number; left: number } | null>(null);
+  function toggleGreek() {
+    setShowGreek((s) => {
+      const next = !s;
+      if (next && greekBtnRef.current) {
+        const r = greekBtnRef.current.getBoundingClientRect();
+        setGreekPos({ top: r.bottom + 4, left: r.left });
+      }
+      return next;
+    });
+  }
   const inputRef = useRef<HTMLInputElement>(null);
 
   let rendered = ''; let renderError = false; let errorMsg = '';
@@ -150,16 +163,18 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
           <button type="button" className={tBtn} title="Integral" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\int_{}^{}', 6)}>∫</button>
           <button type="button" className={tBtn} title="Brackets" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('\\left( \\right)', 7)}>( )</button>
           <div style={{ position: 'relative' }}>
-            <button type="button" className={tBtn} title="Greek letters" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowGreek((s) => !s)}>αβγ</button>
-            {showGreek && (
-              <div className="absolute z-[100] top-8 left-0 w-[200px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-4 gap-0.5">
+            <button ref={greekBtnRef} type="button" className={tBtn} title="Greek letters" onMouseDown={(e) => e.preventDefault()} onClick={toggleGreek}>αβγ</button>
+            {showGreek && greekPos && createPortal(
+              <div style={{ position: 'fixed', top: greekPos.top, left: greekPos.left, zIndex: 1000 }}
+                className="w-[200px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-4 gap-0.5">
                 {GREEK.map((g) => (
                   <button key={g} type="button" onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { insert(g + ' '); setShowGreek(false); }}
                     className="text-[13px] p-1 rounded hover:bg-[var(--color-accent-bg)] cursor-pointer border-none bg-transparent"
                     dangerouslySetInnerHTML={{ __html: (() => { try { return katex.renderToString(g, { throwOnError: false }); } catch { return g; } })() }} />
                 ))}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>

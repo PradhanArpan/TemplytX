@@ -5,6 +5,7 @@
  * Inserts a \ref to the chosen target.
  */
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { DocumentBlock } from '../../types/document';
 import { crossRefData } from '../references/format';
 
@@ -18,6 +19,17 @@ export function RefMenu({ blocks, onPick }: {
   const [cat, setCat] = useState<'figure' | 'table' | 'equation' | null>(null);
   const [figOpen, setFigOpen] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  function toggle() {
+    setOpen((v) => {
+      const next = !v;
+      if (next && trigger.current) {
+        const r = trigger.current.getBoundingClientRect();
+        setPos({ top: r.bottom + 4, left: r.left });
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -69,15 +81,18 @@ export function RefMenu({ blocks, onPick }: {
   const itemCls = 'w-full text-left text-[12px] font-medium px-3 py-2 cursor-pointer border-none rounded-md bg-transparent text-[var(--color-text)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] flex items-center justify-between gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]';
 
   return (
-    <div className="relative" onMouseLeave={() => { setOpen(false); setCat(null); setFigOpen(null); }}>
-      <button ref={trigger} type="button" onClick={() => setOpen((v) => !v)}
+    <div className="relative">
+      <button ref={trigger} type="button" onClick={toggle}
         aria-haspopup="menu" aria-expanded={open} aria-controls="editor-reference-menu"
         className="min-h-8 text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center gap-1.5 shadow-[var(--shadow-card)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]">
         Insert \ref <span className="text-[var(--color-faint)]">▾</span>
       </button>
 
-      {open && (
-        <div id="editor-reference-menu" role="menu" className="absolute z-[100] top-9 left-0 flex items-start gap-1.5">
+      {open && pos && createPortal(
+        <div id="editor-reference-menu" role="menu"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 1000 }}
+          className="flex items-start gap-1.5"
+          onMouseLeave={() => { setOpen(false); setCat(null); setFigOpen(null); }}>
           {/* level 1: categories */}
           <div className={colCls}>
             {cats.map((c) => (
@@ -116,7 +131,8 @@ export function RefMenu({ blocks, onPick }: {
               ))}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
