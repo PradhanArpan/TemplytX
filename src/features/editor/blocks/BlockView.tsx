@@ -7,6 +7,7 @@ import { useRef, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { RichParagraph } from './RichParagraph';
+import { setActiveField } from '../activeField';
 import { ImageInput } from './ImageInput';
 import type {
   DocumentBlock, SectionBlock, ParagraphBlock,
@@ -374,6 +375,8 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
                   <td key={c} style={{ padding: 0, borderLeft: c > 0 ? vline : undefined,
                     width: widths[c] > 0 ? `${widths[c]}%` : undefined }}>
                     <input value={cell} onChange={(e) => setCell(r, c, e.target.value)}
+                      onFocus={(e) => setActiveField({ el: e.currentTarget, setValue: (v) => setCell(r, c, v) })}
+                      onBlur={() => setActiveField(null)}
                       style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 14,
                         padding: '6px 9px', fontWeight: r === 0 ? 600 : 400,
                         textAlign: align[c] ?? 'left' }} />

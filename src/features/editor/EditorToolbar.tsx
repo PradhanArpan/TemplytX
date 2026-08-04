@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { Bold, Italic, Superscript, Subscript, Sigma } from 'lucide-react';
+import { insertIntoActiveField } from './activeField';
 
 const SYMBOLS = [
   'α','β','γ','δ','ε','θ','λ','μ','π','σ','φ','ω','Δ','Σ','Ω',
@@ -29,6 +30,8 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
     onAfter?.();
   }
   function insertSymbol(sym: string) {
+    // If a plain input (e.g. a table cell) is focused, insert the symbol there.
+    if (insertIntoActiveField(sym)) { setShowSymbols(false); onAfter?.(); return; }
     // Insert the symbol in italics (math variables are conventionally italic).
     document.execCommand('insertHTML', false, `<i>${sym}</i>`);
     setShowSymbols(false);
