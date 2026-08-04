@@ -77,7 +77,7 @@ export function RefMenu({ blocks, onPick }: {
       </button>
 
       {open && (
-        <div id="editor-reference-menu" role="menu" className="absolute z-40 top-9 left-0 flex items-start gap-1.5">
+        <div id="editor-reference-menu" role="menu" className="absolute z-[100] top-9 left-0 flex items-start gap-1.5">
           {/* level 1: categories */}
           <div className={colCls}>
             {cats.map((c) => (

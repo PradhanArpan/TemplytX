@@ -56,7 +56,7 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
           onClick={(e) => { if (e.detail === 0) setShowSymbols((s) => !s); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
         {showSymbols && (
           <div id="editor-symbol-menu" role="menu" aria-label="Symbols"
-            className="absolute z-30 top-9 left-0 w-[256px] p-2.5 bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-1">
+            className="absolute z-[100] top-9 left-0 w-[256px] p-2.5 bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-1">
             {SYMBOLS.map((s) => (
               <button key={s} type="button" role="menuitem" aria-label={`Insert ${s}`}
                 onMouseDown={(e) => { e.preventDefault(); insertSymbol(s); }}

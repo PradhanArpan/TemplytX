@@ -130,7 +130,7 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-        background: 'var(--color-surface)', margin: '6px 0', overflow: 'hidden' }}>
+        background: 'var(--color-surface)', margin: '6px 0' }}>
         <div style={{ padding: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center',
           minHeight: 48, borderBottom: '1px solid var(--color-border)',
           background: renderError ? 'var(--status-error-bg)' : 'var(--color-bg)' }}>
@@ -151,7 +151,7 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
           <div style={{ position: 'relative' }}>
             <button type="button" className={tBtn} title="Greek letters" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowGreek((s) => !s)}>αβγ</button>
             {showGreek && (
-              <div className="absolute z-30 top-8 left-0 w-[200px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-4 gap-0.5">
+              <div className="absolute z-[100] top-8 left-0 w-[200px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-4 gap-0.5">
                 {GREEK.map((g) => (
                   <button key={g} type="button" onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { insert(g + ' '); setShowGreek(false); }}

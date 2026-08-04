@@ -68,7 +68,8 @@ export function EditorScreen() {
   const [christMeta, setChristMeta] = useState<ChristThesisMeta | null>(null);
   const [showChristForm, setShowChristForm] = useState(false);
   const [focusChapterId, setFocusChapterId] = useState<string | null>(null);
-  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set());
+  const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
+  const [rightHidden, setRightHidden] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const leftPanel = useRef<HTMLElement | null>(null);
@@ -147,10 +148,19 @@ export function EditorScreen() {
     if (!id) return;
     getDocument(id).then((d) => {
       setDoc(d);
-      setBlocks(d?.blocks ?? []);
+      const loaded = d?.blocks ?? [];
+      setBlocks(loaded);
       setAuthors(d?.authors ?? []);
       setDocTitle(d?.title ?? '');
       setChristMeta(d?.christThesis ?? null);
+      // Performance: very large documents (e.g. a 350-page import) are slow to
+      // render all at once. Auto-focus the first chapter so only that chapter's
+      // blocks render initially; the user can pick another or "Show whole
+      // document" at any time. Threshold keeps normal-size docs unaffected.
+      if (loaded.length > 150) {
+        const firstChapter = loaded.find((b) => b.type === 'section' && ((b as { level?: number }).level ?? 1) <= 1);
+        if (firstChapter) setFocusChapterId(firstChapter.id);
+      }
       if (d?.targetTemplateId) listTemplates().then((ts) =>
         setTpl(ts.find((t) => t.id === d.targetTemplateId) ?? null));
     });
@@ -392,6 +402,11 @@ export function EditorScreen() {
               {saved ? 'Saved' : 'Saving…'}
             </motion.span>
           </AnimatePresence>
+          <button type="button" onClick={() => setRightHidden((v) => !v)}
+            className="hidden min-[1200px]:inline-flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-[var(--radius)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text)] cursor-pointer"
+            title={rightHidden ? 'Show readiness & labels panel' : 'Hide panel for more writing space'}>
+            <PanelRight size={13} /> {rightHidden ? 'Show panel' : 'Hide panel'}
+          </button>
           <Button variant="secondary" size="sm" onClick={() => navigate(`/doc/${id}/export`)}>Export</Button>
         </div>
       </div>
@@ -453,19 +468,19 @@ export function EditorScreen() {
           <div className="flex flex-col gap-0.5">
             {chapters.length === 0 && sections.length === 0 && <span className="text-[13px] text-[var(--color-faint)]">Add a section to begin</span>}
             {chapters.map((c) => {
-              const collapsed = collapsedChapters.has(c.id);
+              const collapsed = expandedChapter !== c.id;
               const focused = focusChapterId === c.id;
               return (
                 <div key={c.id}>
                   <div className={`flex items-center gap-1 rounded-[var(--radius)] ${focused ? 'bg-[var(--color-accent-bg)]' : ''}`}>
                     {c.children.length > 0 ? (
-                      <button onClick={() => setCollapsedChapters((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })}
+                      <button onClick={() => setExpandedChapter((cur) => cur === c.id ? null : c.id)}
                         className="text-[var(--color-faint)] hover:text-[var(--color-text)] cursor-pointer border-none bg-transparent px-1 text-[11px]"
                         aria-label={collapsed ? 'Expand' : 'Collapse'}>
                         {collapsed ? '▸' : '▾'}
                       </button>
                     ) : <span className="px-1 text-[11px] opacity-0">▸</span>}
-                    <button onClick={() => { setFocusChapterId(c.id); goToBlock(c.id); }}
+                    <button onClick={() => { setExpandedChapter(c.id); setFocusChapterId(c.id); goToBlock(c.id); }}
                       className={`flex-1 text-left px-1.5 py-1.5 rounded-[var(--radius)] text-[13px] font-medium cursor-pointer hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] border-none bg-transparent truncate ${focused ? 'text-[var(--color-accent)]' : 'text-[var(--color-text)]'}`}
                       title="Click to focus this chapter">
                       {c.title}
@@ -580,7 +595,7 @@ export function EditorScreen() {
           inert={compactPanels && panel !== 'right'} aria-hidden={compactPanels && panel !== 'right'}
           role={compactPanels && panel === 'right' ? 'dialog' : undefined} aria-modal={compactPanels && panel === 'right' ? true : undefined}
           aria-label="Readiness and labels" className={`border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface-2)] overflow-y-auto
-          min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0
+          ${rightHidden ? 'min-[1200px]:hidden' : 'min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0'}
           max-[1200px]:fixed max-[1200px]:top-14 max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:z-50
           max-[1200px]:w-[min(340px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200 max-[1200px]:shadow-[var(--shadow-modal)]
           ${panel === 'right' ? 'max-[1200px]:translate-x-0' : 'max-[1200px]:translate-x-full'}`}>

@@ -72,13 +72,20 @@ export function buildKmea(doc: TemplytXDocument): string {
     else if (b.type === 'equation') { refLabels.set(b.id, `eq:${b.id.slice(0, 8)}`); refKind.set(b.id, 'equation'); }
   });
 
+  // Titles that are front-matter, not numbered chapters.
+  const FRONT = /^(foreword|acknowledge?ments?|executive summary|summary|preface|abstract)$/i;
   const parts: string[] = [];
   let openedChapter = false;
   for (const b of doc.blocks) {
     if (b.type === 'section') {
       const lvl = (b as { level?: number }).level ?? 1;
-      const title = texEscape((b as { title: string }).title);
-      if (lvl <= 1) { parts.push(`\\chapter{${title}}`); openedChapter = true; }
+      const rawTitle = (b as { title: string }).title;
+      const title = texEscape(rawTitle);
+      if (lvl <= 1 && FRONT.test(rawTitle.trim())) {
+        // Unnumbered chapter, still listed in the ToC.
+        parts.push(`\\chapter*{${title}}\\addcontentsline{toc}{chapter}{${title}}`);
+        openedChapter = true;
+      } else if (lvl <= 1) { parts.push(`\\chapter{${title}}`); openedChapter = true; }
       else if (lvl === 2) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\section{${title}}`); }
       else { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsection{${title}}`); }
     } else if (b.type === 'paragraph') {
@@ -95,13 +102,39 @@ export function buildKmea(doc: TemplytXDocument): string {
     } else if (b.type === 'table') {
       const cap = texEscape(b.caption || '');
       const cols = b.rows[0]?.length ?? 1;
-      const align = (b.align ?? Array(cols).fill('left')).map((a) => a === 'center' ? 'c' : a === 'right' ? 'r' : 'l').join('');
-      const rows = b.rows.map((r, ri) => {
-        let line = '    ' + r.map((c) => texEscape(c)).join(' & ') + ' \\\\';
+      const alignCh = (i: number) => {
+        const a = (b.align ?? [])[i];
+        return a === 'center' ? 'c' : a === 'right' ? 'r' : 'l';
+      };
+      // Bold the header row (first row); wrap other cells.
+      const bodyRows = b.rows.map((r, ri) => {
+        const cells = r.map((c) => ri === 0 ? `\\textbf{${texEscape(c)}}` : texEscape(c));
+        let line = '    ' + cells.join(' & ') + ' \\\\';
         if (ri === 0) line += '\n    \\midrule';
         return line;
       }).join('\n');
-      parts.push(`\\begin{table}[htbp]\n\\centering\n\\caption{${cap}}\\label{${refLabels.get(b.id)}}\n\\begin{tabular}{${align}}\n    \\toprule\n${rows}\n    \\bottomrule\n\\end{tabular}\n\\end{table}`);
+
+      // Column spec: for wider tables use tabularx (auto-fits \textwidth,
+      // wraps long cells). Narrow tables use plain l/c/r so they don't stretch.
+      let colspec: string, wrap = false;
+      if (cols >= 3) {
+        wrap = true;
+        colspec = Array.from({ length: cols }, (_, i) => {
+          const a = alignCh(i);
+          return a === 'c' ? '>{\\centering\\arraybackslash}X'
+            : a === 'r' ? '>{\\raggedleft\\arraybackslash}X' : 'X';
+        }).join('');
+      } else {
+        colspec = Array.from({ length: cols }, (_, i) => alignCh(i)).join('');
+      }
+
+      const veryWide = cols >= 6;
+      const openTable = veryWide ? '\\begin{table}[htbp]\n\\centering\n\\begin{landscape}' : '\\begin{table}[htbp]\n\\centering';
+      const closeTable = veryWide ? '\\end{landscape}\n\\end{table}' : '\\end{table}';
+      const tbl = wrap
+        ? `\\begin{tabularx}{\\textwidth}{${colspec}}\n    \\toprule\n${bodyRows}\n    \\bottomrule\n\\end{tabularx}`
+        : `\\begin{tabular}{${colspec}}\n    \\toprule\n${bodyRows}\n    \\bottomrule\n\\end{tabular}`;
+      parts.push(`${openTable}\n\\caption{${cap}}\\label{${refLabels.get(b.id)}}\n${tbl}\n${closeTable}`);
     }
   }
   const body = parts.join('\n\n') || '\\chapter{Introduction}\n';
@@ -117,6 +150,7 @@ ${refList.map((r) => `\\bibitem{${keyMap.get(r.id)}} ${texEscape((r.authors || [
 \\usepackage{kmeareport}
 \\usepackage{nicefrac}
 \\usepackage{booktabs}
+\\usepackage{pdflscape}
 \\usepackage[table]{xcolor}
 \\definecolor{headerblue}{RGB}{173, 216, 230}
 \\let\\oldtoprule\\toprule
