@@ -41,6 +41,8 @@ export interface SectionBlock extends BaseBlock {
   type: 'section';
   level: number; // 1 = top-level section
   title: string;
+  /** Starred/unnumbered heading (\chapter*, \section*, ...). */
+  unnumbered?: boolean;
 }
 
 export interface ParagraphBlock extends BaseBlock {
@@ -53,6 +55,8 @@ export interface EquationBlock extends BaseBlock {
   type: 'equation';
   latex: string; // raw LaTeX, rendered with KaTeX in the editor
   label?: string; // e.g. "eq:thermal" for cross-referencing
+  /** Unnumbered (equation* environment, no \label). */
+  unnumbered?: boolean;
 }
 
 export interface Subfigure {
@@ -72,6 +76,8 @@ export interface FigureBlock extends BaseBlock {
   perRow?: number;
   /** Display width as a percentage of the content column (default 100). */
   width?: number;
+  /** Unnumbered caption (\caption*, not counted/cross-referenceable). */
+  unnumbered?: boolean;
 }
 
 export interface TableBlock extends BaseBlock {
@@ -89,6 +95,8 @@ export interface TableBlock extends BaseBlock {
   colLines?: boolean;
   /** Optional per-column width as a percentage (0 = auto). Length = columns. */
   colWidths?: number[];
+  /** Unnumbered caption (\caption*, not counted/cross-referenceable). */
+  unnumbered?: boolean;
 }
 
 export type DocumentBlock =

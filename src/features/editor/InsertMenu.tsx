@@ -21,9 +21,10 @@ const ITEMS: { type: DocumentBlock['type']; level?: number; label: string }[] = 
 ];
 
 export function InsertMenu({ onInsert }: {
-  onInsert: (type: DocumentBlock['type'], level?: number) => void;
+  onInsert: (type: DocumentBlock['type'], level?: number, unnumbered?: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [unnumbered, setUnnumbered] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -41,8 +42,9 @@ export function InsertMenu({ onInsert }: {
   }
 
   function pick(type: DocumentBlock['type'], level?: number) {
-    onInsert(type, level);
+    onInsert(type, level, unnumbered);
     setOpen(false);
+    setUnnumbered(false);
   }
 
   const btn = 'min-h-8 text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center gap-1.5 shadow-[var(--shadow-card)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]';
@@ -58,7 +60,14 @@ export function InsertMenu({ onInsert }: {
       {open && pos && createPortal(
         <div ref={menuRef} id="editor-insert-menu" role="menu"
           style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 1000 }}
-          className="min-w-[160px] max-h-[320px] overflow-y-auto bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] p-1">
+          className="min-w-[190px] max-h-[360px] overflow-y-auto bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] p-1">
+          <button type="button" onClick={() => setUnnumbered((v) => !v)} aria-pressed={unnumbered}
+            title="Insert without a number (e.g. \chapter*, \caption*, equation*)"
+            className={`w-full flex items-center gap-2 text-left text-[11px] px-3 py-1.5 mb-1 rounded-md border-none cursor-pointer transition-colors ${unnumbered ? 'bg-[var(--color-accent-bg)] text-[var(--color-accent)]' : 'bg-transparent text-[var(--color-muted)] hover:bg-[var(--color-surface)]'}`}>
+            <span className={`inline-flex items-center justify-center w-4 h-4 rounded border font-mono text-[11px] ${unnumbered ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'}`}>*</span>
+            Insert unnumbered
+          </button>
+          <div className="border-t border-[var(--color-border)] mb-1" />
           {ITEMS.map((it) => (
             <button key={it.label} type="button" role="menuitem" className={itemCls}
               onClick={() => pick(it.type, it.level)}>

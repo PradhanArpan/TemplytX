@@ -28,6 +28,23 @@ const bare: React.CSSProperties = {
   color: 'var(--color-text)', padding: 0, resize: 'none',
 };
 
+/** Small "*" toggle for unnumbered sections/figures/tables/equations —
+ *  matches the same toggle offered at insert time (InsertMenu.tsx), so it
+ *  can be flipped after the fact too. */
+function UnnumberedToggle({ on, onToggle, title }: { on?: boolean; onToggle: () => void; title?: string }) {
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={!!on}
+      title={title ?? (on ? 'Unnumbered — click to number it' : 'Numbered — click to make unnumbered (*)')}
+      style={{
+        border: `1px solid ${on ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        background: on ? 'var(--color-accent-bg)' : 'transparent',
+        color: on ? 'var(--color-accent)' : 'var(--color-faint)',
+        borderRadius: 4, fontSize: 10, fontFamily: 'var(--font-mono)', lineHeight: 1,
+        padding: '2px 5px', cursor: 'pointer',
+      }}>*</button>
+  );
+}
+
 function BlockShell({ children, onDelete, blockId }: {
   children: React.ReactNode; onDelete: () => void; blockId: string;
 }) {
@@ -71,6 +88,7 @@ export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlo
             disabled={level === 4}
             style={{ border: 'none', background: 'transparent', cursor: level === 4 ? 'default' : 'pointer',
               color: level === 4 ? 'var(--color-faint)' : 'var(--color-muted)', fontSize: 13, padding: '0 3px', opacity: level === 4 ? 0.4 : 1 }}>►</button>
+          <UnnumberedToggle on={block.unnumbered} onToggle={() => onChange({ unnumbered: !block.unnumbered })} />
         </div>
         <input value={block.title} placeholder={`${levelLabel} title`}
           onChange={(e) => onChange({ title: e.target.value })}
@@ -193,6 +211,8 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
             onChange={(e) => onChange({ label: e.target.value } as Partial<EquationBlock>)}
             style={{ ...bare, fontFamily: 'var(--font-ui)', fontSize: 12, width: 90, textAlign: 'right',
               color: 'var(--color-muted)' }} />
+          <UnnumberedToggle on={block.unnumbered}
+            onToggle={() => onChange({ unnumbered: !block.unnumbered } as Partial<EquationBlock>)} />
         </div>
         {focused && (
           <div style={{ padding: '0 12px 8px', fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--color-faint)' }}>
@@ -246,6 +266,8 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
           <span className="text-[10.5px] text-[var(--color-faint)] ml-auto">
             {subs.length > 0 ? `${subs.length} subfigure${subs.length === 1 ? '' : 's'}` : 'single image'}
           </span>
+          <UnnumberedToggle on={block.unnumbered}
+            onToggle={() => onChange({ unnumbered: !block.unnumbered } as Partial<FigureBlock>)} />
         </div>
 
         {subs.length === 0 ? (

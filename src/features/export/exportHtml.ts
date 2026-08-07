@@ -7,7 +7,7 @@
 import katex from 'katex';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
-import { computeNumbering } from './numbering';
+import { computeNumbering, type NumberingStyle } from './numbering';
 import { bareMarkerMap, renderCitationsGrouped, orderedReferences, formatEntry, sanitizeInlineHtml, crossRefData, renderCrossRefs } from '../references/format';
 import { listReferencesSync } from '../../services/references';
 
@@ -16,21 +16,21 @@ const esc = (s: string) =>
 
 const spacingMap = { single: 1.15, onehalf: 1.5, double: 2 };
 
-export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): string {
+export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template, numberingStyle: NumberingStyle = 'continuous'): string {
   const fmt = tpl.formatting;
-  const num = computeNumbering(doc.blocks, fmt.numberSections);
+  const num = computeNumbering(doc.blocks, fmt.numberSections, numberingStyle);
   const margin = fmt.paperSize === 'a4' ? '2.5cm' : '1in';
   const pool = listReferencesSync();
   const bare = bareMarkerMap(doc.blocks, pool, tpl);
   const numeric = tpl.citationStyle === 'ieee';
-  const xrefs = crossRefData(doc.blocks);
+  const xrefs = crossRefData(doc.blocks, numberingStyle);
   const refList = orderedReferences(doc.blocks, pool, tpl);
 
   let secN = 0;
   const body = doc.blocks.map((b) => {
     switch (b.type) {
       case 'section': {
-        const n = fmt.numberSections ? `${++secN}. ` : '';
+        const n = (fmt.numberSections && !b.unnumbered) ? `${++secN}. ` : '';
         return `<h2 class="sec">${n}${esc(b.title)}</h2>`;
       }
       case 'paragraph':
@@ -42,7 +42,7 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         let math = '';
         try { math = katex.renderToString(b.latex || '\\;', { displayMode: true, throwOnError: false }); }
         catch { math = esc(b.latex); }
-        return `<div class="eq"><span class="eq-body">${math}</span><span class="eq-num">(${n})</span></div>`;
+        return `<div class="eq"><span class="eq-body">${math}</span>${n ? `<span class="eq-num">(${n})</span>` : ''}</div>`;
       }
       case 'figure': {
         const n = num.figures.get(b.id);
@@ -58,9 +58,10 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
           }).join('')}</div>`;
         } else {
           const w = b.width && b.width < 100 ? ` style="width:${b.width}%"` : '';
-          inner = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"${w}/>` : `<div class="fig-ph">[Figure ${n}]</div>`;
+          inner = b.src ? `<img src="${esc(b.src)}" alt="${esc(b.caption)}"${w}/>` : `<div class="fig-ph">${n ? `[Figure ${n}]` : '[Figure]'}</div>`;
         }
-        return `<figure class="fig">${inner}<figcaption><strong>Figure ${n}.</strong> ${esc(b.caption)}</figcaption></figure>`;
+        const figPrefix = n ? `<strong>Figure ${n}.</strong> ` : '';
+        return `<figure class="fig">${inner}<figcaption>${figPrefix}${esc(b.caption)}</figcaption></figure>`;
       }
       case 'table': {
         const n = num.tables.get(b.id);
@@ -88,7 +89,8 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
         }).join('');
         const cap = b.caption ? ` ${esc(b.caption)}` : '';
         const centered = b.centered ? ' style="text-align:center"' : '';
-        return `<div class="tbl"${centered}><div class="tbl-cap"><strong>Table ${n}.</strong>${cap}</div><table${b.centered ? ' style="margin:0 auto"' : ''}>${rows}</table></div>`;
+        const tblPrefix = n ? `<strong>Table ${n}.</strong>` : '';
+        return `<div class="tbl"${centered}><div class="tbl-cap">${tblPrefix}${cap}</div><table${b.centered ? ' style="margin:0 auto"' : ''}>${rows}</table></div>`;
       }
       default: return '';
     }
@@ -163,8 +165,8 @@ export function buildManuscriptHtml(doc: TemplytXDocument, tpl: Template): strin
 }
 
 /** Opens the manuscript in a new tab where the user can Save-as-PDF. */
-export function exportPdf(doc: TemplytXDocument, tpl: Template) {
-  const html = buildManuscriptHtml(doc, tpl);
+export function exportPdf(doc: TemplytXDocument, tpl: Template, numberingStyle: NumberingStyle = 'continuous') {
+  const html = buildManuscriptHtml(doc, tpl, numberingStyle);
   const w = window.open('', '_blank');
   if (!w) { alert('Please allow pop-ups to export.'); return; }
   w.document.write(html);

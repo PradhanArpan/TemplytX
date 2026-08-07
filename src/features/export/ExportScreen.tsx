@@ -7,6 +7,7 @@ import { ArrowLeft, FileText, FileType, FileCode, TriangleAlert, Users, UserX } 
 import { getDocument, listTemplates } from '../../services/documents';
 import { runCompliance } from '../compliance/engine';
 import { exportPdf } from './exportHtml';
+import { getNumberingStyle } from '../../lib/numberingPref';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
@@ -68,21 +69,22 @@ export function ExportScreen() {
     setLatexError('');
     try {
       const docForExport = includeAuthors ? doc : { ...doc, authors: [] };
+      const numberingStyle = id ? getNumberingStyle(id) : 'continuous';
       if (fmt === 'docx') {
         const { exportDocx } = await import('./exportDocx');
-        await exportDocx(docForExport, tpl);
+        await exportDocx(docForExport, tpl, numberingStyle);
       } else if (fmt === 'latex-src') {
         // Download the .tex source.
         let tex: string;
         if (isChristThesis) {
           const { buildChristThesis } = await import('./exportChristThesis');
-          tex = buildChristThesis({ ...docForExport, christThesis: christMeta });
+          tex = buildChristThesis({ ...docForExport, christThesis: christMeta }, numberingStyle);
         } else if (isKmea) {
           const { buildKmea } = await import('./exportKmea');
-          tex = buildKmea(docForExport);
+          tex = buildKmea(docForExport, numberingStyle);
         } else {
           const { buildLatex } = await import('./exportLatex');
-          tex = buildLatex(docForExport, tpl, latexMode, customClass);
+          tex = buildLatex(docForExport, tpl, latexMode, customClass, numberingStyle);
         }
         const blob = new Blob([tex], { type: 'text/x-tex' });
         const url = URL.createObjectURL(blob);
@@ -94,13 +96,13 @@ export function ExportScreen() {
         let tex: string;
         if (isChristThesis) {
           const { buildChristThesis } = await import('./exportChristThesis');
-          tex = buildChristThesis({ ...docForExport, christThesis: christMeta });
+          tex = buildChristThesis({ ...docForExport, christThesis: christMeta }, numberingStyle);
         } else if (isKmea) {
           const { buildKmea } = await import('./exportKmea');
-          tex = buildKmea(docForExport);
+          tex = buildKmea(docForExport, numberingStyle);
         } else {
           const { buildLatex } = await import('./exportLatex');
-          tex = buildLatex(docForExport, tpl, latexMode, customClass);
+          tex = buildLatex(docForExport, tpl, latexMode, customClass, numberingStyle);
         }
         try {
           const res = await fetch(`${LATEX_SERVER}/compile`, {
@@ -119,7 +121,7 @@ export function ExportScreen() {
           setLatexError('Could not reach your local LaTeX server. Start it (run start-latex.bat or `node server.js`), then try again.');
         }
       } else {
-        exportPdf(docForExport, tpl);
+        exportPdf(docForExport, tpl, numberingStyle);
       }
     } finally { setBusy(false); }
   }

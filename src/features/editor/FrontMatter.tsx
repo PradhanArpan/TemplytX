@@ -7,11 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Star, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Author } from '../../types/document';
 
-export function FrontMatter({ title, authors, onTitle, onAuthors }: {
+export function FrontMatter({ title, authors, onTitle, onAuthors, showAuthors = true }: {
   title: string;
   authors: Author[];
   onTitle: (t: string) => void;
   onAuthors: (a: Author[]) => void;
+  /** Journals have multi-author bylines; thesis/report/proposal/lab-report/
+   *  cv/project targets don't — hide the author UI for those, title only. */
+  showAuthors?: boolean;
 }) {
   function addAuthor() {
     onAuthors([...authors, {
@@ -41,6 +44,8 @@ export function FrontMatter({ title, authors, onTitle, onAuthors }: {
         placeholder="Document title"
         className="tx-document w-full text-[26px] font-semibold bg-transparent border-none outline-none text-[var(--color-text)] mb-4 placeholder:text-[var(--color-faint)]" />
 
+      {showAuthors && (
+      <>
       <div className="flex flex-col gap-2">
         <AnimatePresence>
           {authors.map((a) => (
@@ -86,6 +91,8 @@ export function FrontMatter({ title, authors, onTitle, onAuthors }: {
         <div className="text-[11px] text-[var(--color-faint)] mt-2 flex items-center gap-1">
           <Star size={10} fill="var(--color-accent)" style={{ color: 'var(--color-accent)' }} /> corresponding author
         </div>
+      )}
+      </>
       )}
     </div>
   );

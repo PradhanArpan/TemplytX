@@ -8,12 +8,14 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { DocumentBlock } from '../../types/document';
 import { crossRefData } from '../references/format';
+import type { NumberingStyle } from '../export/numbering';
 
 interface Item { id: string; label: string; subs?: { id: string; label: string }[]; }
 
-export function RefMenu({ blocks, onPick }: {
+export function RefMenu({ blocks, onPick, numberingStyle }: {
   blocks: DocumentBlock[];
   onPick: (id: string) => void;
+  numberingStyle?: NumberingStyle;
 }) {
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState<'figure' | 'table' | 'equation' | null>(null);
@@ -43,7 +45,7 @@ export function RefMenu({ blocks, onPick }: {
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [open]);
 
-  const data = crossRefData(blocks);
+  const data = crossRefData(blocks, numberingStyle);
 
   // Build grouped items with subfigures nested under their figure.
   const figures: Item[] = [];
@@ -85,7 +87,7 @@ export function RefMenu({ blocks, onPick }: {
       <button ref={trigger} type="button" onClick={toggle}
         aria-haspopup="menu" aria-expanded={open} aria-controls="editor-reference-menu"
         className="min-h-8 text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer flex items-center gap-1.5 shadow-[var(--shadow-card)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]">
-        Insert \ref <span className="text-[var(--color-faint)]">▾</span>
+        \ref <span className="text-[var(--color-faint)]">▾</span>
       </button>
 
       {open && pos && createPortal(

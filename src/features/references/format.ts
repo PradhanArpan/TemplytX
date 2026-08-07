@@ -146,18 +146,18 @@ export function sanitizeInlineHtml(html: string): string {
 }
 
 // --- cross-references to figures / tables / equations ------------------------
-import { computeNumbering } from '../export/numbering';
+import { computeNumbering, type NumberingStyle } from '../export/numbering';
 
 export const REF_RE = /\[\[ref:([a-z0-9:-]+)\]\]/gi;
 
 export interface CrossRef {
   kind: 'figure' | 'table' | 'equation';
-  number: string;   // "2", "1", "3", or "2a" for a subfigure
+  number: string;   // "2", "1", "3", "2.1" (by-chapter), or "2a" for a subfigure
 }
 
 /** Map of ref-id -> {kind, number}. Subfigures use id "blockId:subId". */
-export function crossRefData(blocks: DocumentBlock[]): Map<string, CrossRef> {
-  const num = computeNumbering(blocks, false);
+export function crossRefData(blocks: DocumentBlock[], style: NumberingStyle = 'continuous'): Map<string, CrossRef> {
+  const num = computeNumbering(blocks, false, style);
   const map = new Map<string, CrossRef>();
   num.figures.forEach((n, id) => {
     map.set(id, { kind: 'figure', number: String(n) });
@@ -175,8 +175,8 @@ export function crossRefData(blocks: DocumentBlock[]): Map<string, CrossRef> {
 }
 
 /** Short label for the picker/editor chip (always abbreviated). */
-export function crossRefMap(blocks: DocumentBlock[]): Map<string, string> {
-  const data = crossRefData(blocks);
+export function crossRefMap(blocks: DocumentBlock[], style: NumberingStyle = 'continuous'): Map<string, string> {
+  const data = crossRefData(blocks, style);
   const map = new Map<string, string>();
   data.forEach((d, id) => {
     const short = d.kind === 'figure' ? `Fig. ${d.number}`

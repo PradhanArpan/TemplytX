@@ -11,6 +11,7 @@
 import type { TemplytXDocument } from '../../types/document';
 import { orderedReferences } from '../references/format';
 import { formatTable } from './formatTable';
+import type { NumberingStyle } from './numbering';
 import { listReferencesSync } from '../../services/references';
 
 const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
@@ -56,7 +57,7 @@ function richToLatex(html: string, keyMap: Map<string, string>,
   return s;
 }
 
-export function buildKmea(doc: TemplytXDocument): string {
+export function buildKmea(doc: TemplytXDocument, numberingStyle: NumberingStyle = 'continuous'): string {
   const syncPool = listReferencesSync();
   const byId = new Map<string, typeof syncPool[number]>();
   [...syncPool, ...(doc.references ?? [])].forEach((r) => byId.set(r.id, r));
@@ -82,25 +83,28 @@ export function buildKmea(doc: TemplytXDocument): string {
       const lvl = (b as { level?: number }).level ?? 1;
       const rawTitle = (b as { title: string }).title;
       const title = texEscape(rawTitle);
-      if (lvl <= 1 && FRONT.test(rawTitle.trim())) {
+      const unnumbered = (b as { unnumbered?: boolean }).unnumbered || (lvl <= 1 && FRONT.test(rawTitle.trim()));
+      if (lvl <= 1 && unnumbered) {
         // Unnumbered chapter, still listed in the ToC.
         parts.push(`\\chapter*{${title}}\\addcontentsline{toc}{chapter}{${title}}`);
         openedChapter = true;
       } else if (lvl <= 1) { parts.push(`\\chapter{${title}}`); openedChapter = true; }
-      else if (lvl === 2) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\section{${title}}`); }
-      else if (lvl === 3) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsection{${title}}`); }
-      else { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsubsection{${title}}`); }
+      else if (lvl === 2) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\section${unnumbered ? '*' : ''}{${title}}`); }
+      else if (lvl === 3) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsection${unnumbered ? '*' : ''}{${title}}`); }
+      else { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsubsection${unnumbered ? '*' : ''}{${title}}`); }
     } else if (b.type === 'paragraph') {
       if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; }
       parts.push(richToLatex(b.content, keyMap, refLabels, refKind) + '\n');
     } else if (b.type === 'equation') {
-      parts.push(`\\begin{equation}\\label{${refLabels.get(b.id)}}\n${b.latex || ''}\n\\end{equation}`);
+      if (b.unnumbered) parts.push(`\\begin{equation*}\n${b.latex || ''}\n\\end{equation*}`);
+      else parts.push(`\\begin{equation}\\label{${refLabels.get(b.id)}}\n${b.latex || ''}\n\\end{equation}`);
     } else if (b.type === 'figure') {
       const cap = texEscape(b.caption || '');
       const localImg = (src: string, w: string) =>
         src && !/^https?:\/\//i.test(src) ? `\\includegraphics[width=${w}]{${src}}` : `\\fbox{\\parbox[c][2cm][c]{${w}}{\\centering [figure]}}`;
       const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
-      parts.push(`\\begin{figure}[htbp]\n\\centering\n${localImg(b.src, `${width}\\linewidth`)}\n\\caption{${cap}}\\label{${refLabels.get(b.id)}}\n\\end{figure}`);
+      const captionTex = b.unnumbered ? `\\caption*{${cap}}` : `\\caption{${cap}}\\label{${refLabels.get(b.id)}}`;
+      parts.push(`\\begin{figure}[htbp]\n\\centering\n${localImg(b.src, `${width}\\linewidth`)}\n${captionTex}\n\\end{figure}`);
     } else if (b.type === 'table') {
       parts.push(formatTable(b, {
         label: refLabels.get(b.id), esc: texEscape,
@@ -122,6 +126,7 @@ ${refList.map((r) => `\\bibitem{${keyMap.get(r.id)}} ${texEscape((r.authors || [
 \\usepackage{nicefrac}
 \\usepackage{booktabs}
 \\usepackage{pdflscape}
+\\usepackage{caption}
 \\usepackage[table]{xcolor}
 \\definecolor{headerblue}{RGB}{173, 216, 230}
 \\let\\oldtoprule\\toprule
@@ -131,7 +136,7 @@ ${refList.map((r) => `\\bibitem{${keyMap.get(r.id)}} ${texEscape((r.authors || [
 \\reportPI{Dr Shibu K Mani}
 \\reportinstitution{CHRIST (Deemed to be University)}
 \\reportdate{\\today}
-\\begin{document}
+${numberingStyle === 'byChapter' ? '\\numberwithin{equation}{chapter}\n' : ''}\\begin{document}
 \\input{front/cover}
 \\input{front/inside-title}\\newpage
 \\input{front/copyright}

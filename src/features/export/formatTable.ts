@@ -20,6 +20,8 @@ export interface TableLike {
   bottomRule?: boolean;
   rowLines?: boolean;
   colLines?: boolean;
+  /** \caption* (no number, not cross-referenceable) — needs \usepackage{caption}. */
+  unnumbered?: boolean;
 }
 
 export interface TableOptions {
@@ -43,7 +45,8 @@ export function formatTable(t: TableLike, opts: TableOptions): string {
   const landscapeForWide = opts.landscapeForWide !== false;
   const cols = t.rows[0]?.length ?? 1;
   const cap = esc(t.caption || '');
-  const label = opts.label ? `\\label{${opts.label}}` : '';
+  const label = (t.unnumbered ? '' : (opts.label ? `\\label{${opts.label}}` : ''));
+  const captionCmd = t.unnumbered ? '\\caption*' : '\\caption';
 
   const alignCh = (i: number) => {
     const a = (t.align ?? [])[i];
@@ -87,8 +90,8 @@ export function formatTable(t: TableLike, opts: TableOptions): string {
   }
 
   if (veryWide && landscapeForWide) {
-    return `\\begin{table}[htbp]\n\\centering\n\\begin{landscape}\n\\caption{${cap}}${label}\n${inner}\n\\end{landscape}\n\\end{table}`;
+    return `\\begin{table}[htbp]\n\\centering\n\\begin{landscape}\n${captionCmd}{${cap}}${label}\n${inner}\n\\end{landscape}\n\\end{table}`;
   }
   const env = opts.wideFloat ? 'table*' : 'table';
-  return `\\begin{${env}}[htbp]\n  \\centering\n  \\caption{${cap}}${label}\n  ${inner}\n\\end{${env}}`;
+  return `\\begin{${env}}[htbp]\n  \\centering\n  ${captionCmd}{${cap}}${label}\n  ${inner}\n\\end{${env}}`;
 }

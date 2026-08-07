@@ -10,7 +10,7 @@ import {
 import { saveAs } from 'file-saver';
 import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
-import { computeNumbering } from './numbering';
+import { computeNumbering, type NumberingStyle } from './numbering';
 import { bareMarkerMap, renderCitationsGrouped, orderedReferences, formatEntry, sanitizeInlineHtml, crossRefData, renderCrossRefs } from '../references/format';
 import { listReferencesSync } from '../../services/references';
 
@@ -51,14 +51,14 @@ function htmlToRuns(html: string, size: number, baseFmt: RunFmt = {}): TextRun[]
   return runs.length ? runs : [new TextRun({ text: '', size, ...baseFmt })];
 }
 
-export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
+export async function exportDocx(doc: TemplytXDocument, tpl: Template, numberingStyle: NumberingStyle = 'continuous') {
   const fmt = tpl.formatting;
-  const num = computeNumbering(doc.blocks, fmt.numberSections);
+  const num = computeNumbering(doc.blocks, fmt.numberSections, numberingStyle);
   const half = fmt.bodyFontPt * 2; // docx uses half-points
   const pool = listReferencesSync();
   const bare = bareMarkerMap(doc.blocks, pool, tpl);
   const numeric = tpl.citationStyle === 'ieee';
-  const xrefs = crossRefData(doc.blocks);
+  const xrefs = crossRefData(doc.blocks, numberingStyle);
   const refList = orderedReferences(doc.blocks, pool, tpl);
 
   const children: (Paragraph | Table)[] = [
@@ -96,7 +96,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
   let secN = 0;
   for (const b of doc.blocks) {
     if (b.type === 'section') {
-      const n = fmt.numberSections ? `${++secN}. ` : '';
+      const n = (fmt.numberSections && !b.unnumbered) ? `${++secN}. ` : '';
       children.push(new Paragraph({
         heading: HeadingLevel.HEADING_2,
         children: [new TextRun({ text: `${n}${b.title}`, bold: true, size: half + 2 })],
@@ -112,19 +112,19 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
       const n = num.equations.get(b.id);
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `${b.latex}    (${n})`, font: 'Cambria Math', size: half })],
+        children: [new TextRun({ text: `${b.latex}${n ? `    (${n})` : ''}`, font: 'Cambria Math', size: half })],
         spacing: { after: 120 },
       }));
     } else if (b.type === 'figure') {
       const n = num.figures.get(b.id);
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `[Figure ${n}]`, color: '777777', size: half })],
+        children: [new TextRun({ text: n ? `[Figure ${n}]` : '[Figure]', color: '777777', size: half })],
       }));
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: `Figure ${n}. `, bold: true, size: half - 2 }),
+          ...(n ? [new TextRun({ text: `Figure ${n}. `, bold: true, size: half - 2 })] : []),
           new TextRun({ text: b.caption, size: half - 2 }),
         ],
         spacing: { after: 120 },
@@ -133,7 +133,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
       const n = num.tables.get(b.id);
       children.push(new Paragraph({
         children: [
-          new TextRun({ text: `Table ${n}. `, bold: true, size: half - 2 }),
+          ...(n ? [new TextRun({ text: `Table ${n}. `, bold: true, size: half - 2 })] : []),
           new TextRun({ text: b.caption ?? '', size: half - 2 }),
         ],
         spacing: { after: 60 },

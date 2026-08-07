@@ -19,6 +19,9 @@ import { InsertMenu } from './InsertMenu';
 import { LabelsMenu } from './LabelsMenu';
 import { ReadinessMenu } from './ReadinessMenu';
 import { TableFormatMenu } from './TableFormatMenu';
+import { NumberingMenu } from './NumberingMenu';
+import type { NumberingStyle } from '../export/numbering';
+import { getNumberingStyle, setNumberingStyle as persistNumberingStyle } from '../../lib/numberingPref';
 import { getActiveTableCell } from './activeField';
 import { FrontMatter } from './FrontMatter';
 import { ChristThesisForm, emptyChristMeta } from '../export/ChristThesisForm';
@@ -40,14 +43,14 @@ function tokensFromEl(node: HTMLElement): string {
   return clone.innerHTML;
 }
 
-function newBlock(type: DocumentBlock['type'], title = '', level = 1): DocumentBlock {
+function newBlock(type: DocumentBlock['type'], title = '', level = 1, unnumbered = false): DocumentBlock {
   const id = `b-${crypto.randomUUID()}`;
   switch (type) {
-    case 'section': return { id, type, level, title };
+    case 'section': return { id, type, level, title, unnumbered };
     case 'paragraph': return { id, type, content: '' };
-    case 'equation': return { id, type, latex: '' };
-    case 'figure': return { id, type, src: '', caption: '' };
-    case 'table': return { id, type, rows: [['Header', 'Header'], ['', '']] };
+    case 'equation': return { id, type, latex: '', unnumbered };
+    case 'figure': return { id, type, src: '', caption: '', unnumbered };
+    case 'table': return { id, type, rows: [['Header', 'Header'], ['', '']], unnumbered };
     default: return { id, type: 'paragraph', content: '' };
   }
 }
@@ -76,6 +79,7 @@ export function EditorScreen() {
   // block was last focused/clicked, so insertion lands where you're working.
   const [lastActiveBlockId, setLastActiveBlockId] = useState<string | null>(null);
   const [activeTableCell, setActiveTableCell] = useState<{ blockId: string; row: number; col: number } | null>(null);
+  const [numberingStyle, setNumberingStyleState] = useState<NumberingStyle>('continuous');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Undo/redo history for the blocks array. Rapid successive edits (typing)
   // within COALESCE_MS of each other collapse into one undo step, matching
@@ -169,6 +173,7 @@ export function EditorScreen() {
 
   useEffect(() => {
     if (!id) return;
+    setNumberingStyleState(getNumberingStyle(id));
     getDocument(id).then((d) => {
       setDoc(d);
       const loaded = d?.blocks ?? [];
@@ -292,10 +297,14 @@ export function EditorScreen() {
       if (id) await updateDocument(id, { authors: a }); setSaved(true);
     }, 800);
   }
+  function changeNumberingStyle(s: NumberingStyle) {
+    setNumberingStyleState(s);
+    if (id) persistNumberingStyle(id, s);
+  }
 
   /** Insert a new block at a given index (default: end). */
-  function insertBlock(type: DocumentBlock['type'], at?: number, level?: number) {
-    const b = newBlock(type, '', level);
+  function insertBlock(type: DocumentBlock['type'], at?: number, level?: number, unnumbered?: boolean) {
+    const b = newBlock(type, '', level, unnumbered);
     const next = [...blocks];
     next.splice(at ?? next.length, 0, b);
     applyBlocks(next, { coalesce: false });
@@ -304,9 +313,9 @@ export function EditorScreen() {
   /** Insert right after whichever block was last focused/clicked (the
    *  toolbar's Insert menu doesn't know a document position on its own),
    *  falling back to the end of the document. */
-  function insertBlockAt(type: DocumentBlock['type'], level?: number) {
+  function insertBlockAt(type: DocumentBlock['type'], level?: number, unnumbered?: boolean) {
     const idx = lastActiveBlockId ? blocks.findIndex((b) => b.id === lastActiveBlockId) : -1;
-    insertBlock(type, idx === -1 ? blocks.length : idx + 1, level);
+    insertBlock(type, idx === -1 ? blocks.length : idx + 1, level, unnumbered);
   }
 
   /** Drag reorder: move dragged block to before the drop target. */
@@ -454,7 +463,7 @@ export function EditorScreen() {
     : null;
   const score = report ? report.score : doc.readinessScore;
   const markers = markerMap(blocks, pool, tpl);
-  const crossRefs = crossRefMap(blocks);
+  const crossRefs = crossRefMap(blocks, numberingStyle);
   const refList = orderedReferences(blocks, pool, tpl);
 
   return (
@@ -502,9 +511,10 @@ export function EditorScreen() {
             el.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }} />
-        <InsertMenu onInsert={(type, level) => insertBlockAt(type, level)} />
+        <InsertMenu onInsert={(type, level, unnumbered) => insertBlockAt(type, level, unnumbered)} />
         <TableFormatMenu blocks={blocks} activeCell={activeTableCell} patchBlock={patchBlock} />
-        <RefMenu blocks={blocks} onPick={(refId) => insertXref(refId)} />
+        {chapters.length > 0 && <NumberingMenu style={numberingStyle} onChange={changeNumberingStyle} />}
+        <RefMenu blocks={blocks} onPick={(refId) => insertXref(refId)} numberingStyle={numberingStyle} />
         <div className="flex items-center gap-1.5 ml-auto min-[1200px]:hidden">
           <button type="button" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel('left'); }}
             aria-label="Open outline and references" aria-expanded={panel === 'left'} aria-controls="editor-left-panel"
@@ -592,7 +602,8 @@ export function EditorScreen() {
           <div className="max-w-[760px] min-h-[calc(100%-32px)] mx-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-paper)] px-5 py-7 sm:px-10 sm:py-10 lg:px-14 lg:py-12">
             {tpl?.id !== 'tpl-christ-thesis' && (
               <FrontMatter title={docTitle} authors={authors}
-                onTitle={saveTitle} onAuthors={saveAuthors} />
+                onTitle={saveTitle} onAuthors={saveAuthors}
+                showAuthors={!tpl || tpl.type === 'journal'} />
             )}
             {tpl?.id === 'tpl-christ-thesis' && (
               <div className="mb-4 flex items-center gap-2 flex-wrap p-2.5 rounded-[var(--radius)] bg-[var(--color-accent-bg)] border border-[var(--color-accent)]/30">

@@ -9,6 +9,7 @@ import type { TemplytXDocument } from '../../types/document';
 import type { Template } from '../../types/compliance';
 import { orderedReferences } from '../references/format';
 import { formatTable } from './formatTable';
+import type { NumberingStyle } from './numbering';
 import { listReferencesSync } from '../../services/references';
 
 const CITE_RE = /\[\[cite:([a-z0-9-]+)\]\]/gi;
@@ -109,7 +110,10 @@ function richToLatex(html: string, keyMap: Map<string, string>,
 
 export type LatexMode = 'submission' | 'cameraready';
 
-export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode = 'submission', customClass = ''): string {
+/** numberingStyle is accepted for call-site consistency with the other
+ *  exporters but is a documented no-op here: `article` (this exporter's
+ *  base class) has no \chapter, so there's nothing to scope numbering by. */
+export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode = 'submission', customClass = '', _numberingStyle?: NumberingStyle): string {
   // Combine the document's stored references with the in-memory pool so
   // citations always resolve (the sync cache may be cold at export time).
   const syncPool = listReferencesSync();
@@ -176,17 +180,20 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
         if (/^abstract$/i.test(b.title.trim())) return `\\section*{${texEscape(b.title)}}`;
         const lvl = (b as { level?: number }).level ?? 1;
         const cmd = lvl <= 1 ? 'section' : lvl === 2 ? 'subsection' : 'subsubsection';
-        return `\\${cmd}{${texEscape(b.title)}}`;
+        const star = b.unnumbered ? '*' : '';
+        return `\\${cmd}${star}{${texEscape(b.title)}}`;
       }
       case 'paragraph':
         return richToLatex(b.content, keyMap, refLabels, refKind) + '\n';
       case 'equation': {
         const lbl = refLabels.get(b.id);
+        if (b.unnumbered) return `\\begin{equation*}\n${b.latex || ''}\n\\end{equation*}`;
         return `\\begin{equation}\\label{${lbl}}\n${b.latex || ''}\n\\end{equation}`;
       }
       case 'figure': {
         const lbl = refLabels.get(b.id);
         const cap = texEscape(b.caption || '');
+        const captionTex = b.unnumbered ? `\\caption*{${cap}}` : `\\caption{${cap}}\\label{${lbl}}`;
         // Local pdflatex can't fetch remote (http) images. If the src is a
         // remote URL, use a placeholder box so the document still compiles.
         // (The server-side image fetch will replace these once enabled.)
@@ -203,10 +210,10 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
           }).join('\n  \\hfill\n');
           // Multi-image figures span both columns in two-column layouts.
           const env = twoCol ? 'figure*' : 'figure';
-          return `\\begin{${env}}[htbp]\n  \\centering\n${subs}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{${env}}`;
+          return `\\begin{${env}}[htbp]\n  \\centering\n${subs}\n  ${captionTex}\n\\end{${env}}`;
         }
         const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
-        return `\\begin{figure}[htbp]\n  \\centering\n  ${localImg(b.src, `${width}\\linewidth`)}\n  \\caption{${cap}}\\label{${lbl}}\n\\end{figure}`;
+        return `\\begin{figure}[htbp]\n  \\centering\n  ${localImg(b.src, `${width}\\linewidth`)}\n  ${captionTex}\n\\end{figure}`;
       }
       case 'table': {
         const lbl = refLabels.get(b.id);
@@ -242,6 +249,11 @@ ${refList.map((r) => {
   const usesSubfig = doc.blocks.some((b) => b.type === 'figure' && (b.subfigures?.length ?? 0) > 0);
   const usesGraphics = doc.blocks.some((b) => b.type === 'figure');
   const usesTables = doc.blocks.some((b) => b.type === 'table');
+  // \caption* (unnumbered figures/tables) needs the `caption` package.
+  // subcaption already pulls it in transitively; load it explicitly too so
+  // an unnumbered figure/table works even with no subfigures present.
+  const usesUnnumberedCaption = doc.blocks.some((b) =>
+    (b.type === 'figure' || b.type === 'table') && (b as { unnumbered?: boolean }).unnumbered);
   const tablePkgs = usesTables
     ? '\\usepackage{booktabs}\n\\usepackage{tabularx}\n\\usepackage{array}\n\\usepackage{pdflscape}'
     : '';
@@ -256,6 +268,7 @@ ${refList.map((r) => {
     '\\usepackage{amsmath,amssymb}',
     usesGraphics ? '\\usepackage{graphicx}' : '',
     usesSubfig ? '\\usepackage{subcaption}' : '',
+    usesUnnumberedCaption ? '\\usepackage{caption}' : '',
     tablePkgs,
     wantsCitePkg ? '\\usepackage{cite}' : '',
   ].filter(Boolean).join('\n');
@@ -274,6 +287,7 @@ ${refList.map((r) => {
       '\\usepackage{amsmath,amssymb}',
       usesGraphics ? '\\usepackage{graphicx}' : '',
       usesSubfig ? '\\usepackage{subcaption}' : '',
+    usesUnnumberedCaption ? '\\usepackage{caption}' : '',
       tablePkgs,
     ].filter(Boolean).join('\n');
     return `\\documentclass{${cls}}

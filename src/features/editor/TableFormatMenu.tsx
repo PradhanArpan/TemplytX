@@ -115,6 +115,8 @@ export function TableFormatMenu({ blocks, activeCell, patchBlock }: {
               <button className={block.rowLines ? activeBtn : ctrlBtn} onClick={() => patch(tableOps.toggleRule(block, 'rowLines'))}>Row lines</button>
               <button className={block.colLines ? activeBtn : ctrlBtn} onClick={() => patch(tableOps.toggleRule(block, 'colLines'))}>Col lines</button>
               <button className={block.centered ? activeBtn : ctrlBtn} onClick={() => patch(tableOps.toggleRule(block, 'centered'))}>Center</button>
+              <button className={block.unnumbered ? activeBtn : ctrlBtn} title="Caption without a table number (\caption*)"
+                onClick={() => patch(tableOps.toggleRule(block, 'unnumbered'))}>Unnumbered</button>
             </div>
           </div>
         </div>,
