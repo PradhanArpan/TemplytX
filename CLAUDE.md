@@ -54,11 +54,14 @@ generative-writing features.
   - `classes/kmea/` = kmeareport.sty + front/ + back/ + logos/.
 
 ## Document model (`src/types/document.ts`)
-Blocks: `section` (has `level`: 1=chapter/section, 2=subsection, 3=subsubsection),
-`paragraph` (rich HTML-ish string), `equation` (LaTeX), `figure`, `table`
-(rows: string[][], align, topRule/headerRule/bottomRule, colWidths…).
-`TemplytXDocument` also has `christThesis?: ChristThesisMeta` (persisted in a
-`christ_thesis jsonb` column).
+Blocks: `section` (has `level`: 1=chapter, 2=section, 3=subsection,
+4=sub-subsection — thesis/KMEA exporters map level 4 to `\subsubsection`;
+`exportLatex.ts` collapses 3 & 4 both into `\subsubsection` since journal
+articles don't need 4 heading tiers), `paragraph` (rich HTML-ish string),
+`equation` (LaTeX), `figure`, `table` (rows: string[][] — each cell is rich
+HTML like a paragraph, not plain text; align, topRule/headerRule/bottomRule,
+colWidths…). `TemplytXDocument` also has `christThesis?: ChristThesisMeta`
+(persisted in a `christ_thesis jsonb` column).
 
 ## Exporters (`src/features/export/`)
 - `exportLatex.ts` — generic/journal (ieee/springer/elsevier/article). Has
@@ -76,7 +79,15 @@ Blocks: `section` (has `level`: 1=chapter/section, 2=subsection, 3=subsubsection
 - `formatTable.ts` — SHARED table formatter used by ALL exporters: header row
   bold by default; 3+ cols auto-fit \textwidth via tabularx with wrapping; 6+
   cols → landscape; narrow tables compact; alignment preserved. Preambles must
-  load tabularx/array/pdflscape/booktabs.
+  load tabularx/array/pdflscape/booktabs. Takes an optional `cellToLatex` hook
+  so each exporter converts rich cell HTML (bold/italic/sup/sub) through its
+  own local `richToLatex` — kept local per exporter ON PURPOSE (KMEA's version
+  skips Unicode→LaTeX conversion since XeLaTeX renders Unicode natively); do
+  NOT extract a shared richToLatex module.
+- `exportDocx.ts` — Word export. `htmlToRuns(html, size, baseFmt?)` walks rich
+  HTML (paragraphs AND table cells) into bold/italic/superscript/subscript
+  TextRuns; `baseFmt` seeds a forced format (e.g. table header row bold) that
+  composes with any nested tags rather than overriding them.
 
 ### Architectural rule (permanent)
 Use the citation package/style of the RESPECTIVE document class/template. Do NOT
@@ -84,21 +95,46 @@ force-load a generic `cite` package on classes that manage citations themselves
 (springer sn-jnl, elsevier elsarticle) — it caused `\@citex` runaways.
 
 ## Editor (`src/features/editor/`)
-- `EditorScreen.tsx` — outline (collapsed by default, one chapter open at a
-  time), focus mode (large docs >150 blocks auto-focus first chapter to reduce
-  lag), "Hide panel" toggle to reclaim writing space.
-- Dropdowns (Insert \ref menu, toolbar symbol menu, equation Greek menu) render
-  as PORTALS to document.body — the toolbar bar has `overflow-x-auto` which
-  clips descendants, so z-index alone can't escape it. Keep them as portals.
-- `activeField.ts` — tracks the focused plain <input> (table cell) so the
-  toolbar's Insert-symbol can insert into a cell at the cursor.
-- Table cells are plain `<input>`; per-cell rich formatting is NOT implemented
-  (deferred). Header bold is automatic; symbol characters in cells are allowed.
+- `EditorScreen.tsx` — 2-column layout (outline+references left, writing
+  center; the right sidebar was removed, writing column now fills that space).
+  Outline collapsed by default, one chapter open at a time. Focus mode (large
+  docs >150 blocks auto-focus first chapter to reduce lag).
+- Undo/redo: in-memory history of the `blocks` array (Ctrl+Z / Ctrl+Y, or the
+  toolbar buttons). Rapid typing coalesces into one undo step; structural
+  edits (insert/delete/move/drag) always start a new one. History resets on
+  page load (not persisted).
+- Title bar has `ReadinessMenu.tsx` — a compact score badge that opens a
+  popover with the gauge, re-check button, and issue list (replaced the old
+  always-visible right-sidebar panel).
+- Formatting toolbar row (left to right): Undo/Redo, `LabelsMenu.tsx`
+  (dropdown wrapping `LabelsPanel`, replaced its own sidebar section),
+  `EditorToolbar.tsx` (Bold/Italic/Sup/Sub/Symbol), `InsertMenu.tsx`
+  (Chapter/Section/Subsection/Sub-subsection/Text/Equation/Figure/Table —
+  inserts right after whichever block was last focused; replaced the old
+  in-document hover "+insert" bar and bottom "Add content" bar entirely),
+  `TableFormatMenu.tsx` (row/col insert-delete, align, width, rule toggles —
+  enabled only while a table cell is focused; `tableOps.ts` holds the pure
+  mutation helpers it and nothing else needs), `RefMenu.tsx` ("Insert \ref").
+- All dropdowns/popovers render as PORTALS to document.body (the toolbar has
+  `overflow-x-auto`, which clips descendants — z-index alone can't escape it)
+  and close on outside click via `useClickOutside.ts`.
+- `activeField.ts` has two independent trackers — don't conflate them:
+  `ActiveField`/`setActiveField`/`insertIntoActiveField` (plain `<input>`s
+  like figure width/perRow: splices text into `.value` since those can't use
+  execCommand) and `setActiveTableCell`/`getActiveTableCell` (which table cell
+  — a contenteditable div — currently has focus, for `TableFormatMenu`; a div
+  has no `.value` so it can't use the first API).
+- Table cells are contenteditable (`RichCell` in `BlockView.tsx`, same pattern
+  as `RichParagraph.tsx` — including its external-resync effect, needed so
+  undo/redo and reloads display correctly, not just persist correctly). Bold/
+  Italic/Sup/Sub and Greek-symbol insertion all work in cells. No citation/
+  cross-ref chips in cells (scoped out on purpose — paragraphs only).
+- Sections have 4 heading levels via in-block ◄►arrows (Chapter/Section/
+  Subsection/Sub-subsection); `InsertMenu` also inserts a heading at a chosen
+  level directly.
 
 ## Known / deferred
 - Springer sn-jnl.cls isn't in MiKTeX → journal-zip upload feature planned.
-- #5 exact layout relocation (Readiness by title, Labels into toolbar) deferred;
-  a "Hide panel" button exists instead.
 - Batch 4 on hold: image storage/cloud/cleanup; multi-user sharing + realtime
   collaboration (the biggest unbuilt item — sharing-with-sync-on-save is nearer
   term than true simultaneous editing).
