@@ -8,6 +8,9 @@ export interface ActiveField {
   el: HTMLInputElement;
   /** Called with the new value after inserting at the cursor. */
   setValue: (v: string) => void;
+  /** Set when the field is a table cell, so the toolbar's table-format menu
+   *  knows which block/row/column it's currently acting on. */
+  meta?: { blockId: string; row: number; col: number };
 }
 
 let current: ActiveField | null = null;
@@ -17,6 +20,11 @@ export function getActiveField(): ActiveField | null {
   // Only valid if the element is still the focused one.
   if (current && document.activeElement === current.el) return current;
   return null;
+}
+
+/** The active field's table-cell location, if the focused field is a table cell. */
+export function getActiveTableCell(): { blockId: string; row: number; col: number } | null {
+  return getActiveField()?.meta ?? null;
 }
 
 /** Insert text at the cursor of the active plain input. Returns true if done. */

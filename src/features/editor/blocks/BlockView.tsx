@@ -9,6 +9,8 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { RichParagraph } from './RichParagraph';
 import { setActiveField } from '../activeField';
+import { useClickOutside } from '../useClickOutside';
+import * as tableOps from '../tableOps';
 import { ImageInput } from './ImageInput';
 import type {
   DocumentBlock, SectionBlock, ParagraphBlock,
@@ -51,7 +53,7 @@ function BlockShell({ children, onDelete, blockId }: {
 
 export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlock>) {
   const level = block.level ?? 1;
-  const levelLabel = level === 1 ? 'Chapter' : level === 2 ? 'Section' : 'Subsection';
+  const levelLabel = level === 1 ? 'Chapter' : level === 2 ? 'Section' : level === 3 ? 'Subsection' : 'Sub-subsection';
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <div style={{ marginLeft: (level - 1) * 20 }}>
@@ -65,15 +67,15 @@ export function SectionView({ block, onChange, onDelete }: BlockProps<SectionBlo
             disabled={level === 1}
             style={{ border: 'none', background: 'transparent', cursor: level === 1 ? 'default' : 'pointer',
               color: level === 1 ? 'var(--color-faint)' : 'var(--color-muted)', fontSize: 13, padding: '0 3px', opacity: level === 1 ? 0.4 : 1 }}>◄</button>
-          <button title="Demote (indent)" onClick={() => onChange({ level: Math.min(3, level + 1) })}
-            disabled={level === 3}
-            style={{ border: 'none', background: 'transparent', cursor: level === 3 ? 'default' : 'pointer',
-              color: level === 3 ? 'var(--color-faint)' : 'var(--color-muted)', fontSize: 13, padding: '0 3px', opacity: level === 3 ? 0.4 : 1 }}>►</button>
+          <button title="Demote (indent)" onClick={() => onChange({ level: Math.min(4, level + 1) })}
+            disabled={level === 4}
+            style={{ border: 'none', background: 'transparent', cursor: level === 4 ? 'default' : 'pointer',
+              color: level === 4 ? 'var(--color-faint)' : 'var(--color-muted)', fontSize: 13, padding: '0 3px', opacity: level === 4 ? 0.4 : 1 }}>►</button>
         </div>
         <input value={block.title} placeholder={`${levelLabel} title`}
           onChange={(e) => onChange({ title: e.target.value })}
           style={{ ...bare, fontFamily: 'var(--font-document)', fontWeight: 600,
-            fontSize: level === 1 ? 19 : level === 2 ? 16 : 14 }} />
+            fontSize: level === 1 ? 19 : level === 2 ? 16 : level === 3 ? 14 : 13 }} />
       </div>
     </BlockShell>
   );
@@ -101,7 +103,9 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
   const [focused, setFocused] = useState(false);
   const [showGreek, setShowGreek] = useState(false);
   const greekBtnRef = useRef<HTMLButtonElement>(null);
+  const greekMenuRef = useRef<HTMLDivElement>(null);
   const [greekPos, setGreekPos] = useState<{ top: number; left: number } | null>(null);
+  useClickOutside(showGreek, [greekBtnRef, greekMenuRef], () => setShowGreek(false));
   function toggleGreek() {
     setShowGreek((s) => {
       const next = !s;
@@ -165,7 +169,7 @@ export function EquationView({ block, onChange, onDelete }: BlockProps<EquationB
           <div style={{ position: 'relative' }}>
             <button ref={greekBtnRef} type="button" className={tBtn} title="Greek letters" onMouseDown={(e) => e.preventDefault()} onClick={toggleGreek}>αβγ</button>
             {showGreek && greekPos && createPortal(
-              <div style={{ position: 'fixed', top: greekPos.top, left: greekPos.left, zIndex: 1000 }}
+              <div ref={greekMenuRef} style={{ position: 'fixed', top: greekPos.top, left: greekPos.left, zIndex: 1000 }}
                 className="w-[200px] p-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius)] shadow-[var(--shadow-modal)] grid grid-cols-4 gap-0.5">
                 {GREEK.map((g) => (
                   <button key={g} type="button" onMouseDown={(e) => e.preventDefault()}
@@ -280,52 +284,11 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
 }
 
 export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>) {
-  const cols = block.rows[0]?.length ?? 0;
-  const align = block.align ?? Array(cols).fill('left');
-  const widths = block.colWidths ?? Array(cols).fill(0);
-  const ctrlBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer transition-colors';
-  const activeBtn = 'text-[11px] px-2 py-0.5 rounded border border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-accent)] cursor-pointer';
-  const miniBtn = 'text-[10px] leading-none w-4 h-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer flex items-center justify-center';
+  const align = block.align ?? Array(block.rows[0]?.length ?? 0).fill('left');
+  const widths = block.colWidths ?? Array(block.rows[0]?.length ?? 0).fill(0);
 
   function setCell(r: number, c: number, v: string) {
-    const rows = block.rows.map((row, ri) => ri === r ? row.map((cell, ci) => (ci === c ? v : cell)) : row);
-    onChange({ rows } as Partial<TableBlock>);
-  }
-  /** Insert a row at index i (i can equal length to append). */
-  function insertRow(i: number) {
-    const rows = [...block.rows];
-    rows.splice(i, 0, Array(cols).fill(''));
-    onChange({ rows } as Partial<TableBlock>);
-  }
-  function deleteRow(i: number) {
-    if (block.rows.length <= 1) return;
-    onChange({ rows: block.rows.filter((_, ri) => ri !== i) } as Partial<TableBlock>);
-  }
-  /** Insert a column at index c. */
-  function insertCol(c: number) {
-    const rows = block.rows.map((row) => { const n = [...row]; n.splice(c, 0, ''); return n; });
-    const a = [...align]; a.splice(c, 0, 'left');
-    const w = [...widths]; w.splice(c, 0, 0);
-    onChange({ rows, align: a, colWidths: w } as Partial<TableBlock>);
-  }
-  function deleteCol(c: number) {
-    if (cols <= 1) return;
-    onChange({
-      rows: block.rows.map((row) => row.filter((_, ci) => ci !== c)),
-      align: align.filter((_, ci) => ci !== c),
-      colWidths: widths.filter((_, ci) => ci !== c),
-    } as Partial<TableBlock>);
-  }
-  function setColAlign(c: number, a: 'left' | 'center' | 'right') {
-    const next = [...align]; next[c] = a;
-    onChange({ align: next } as Partial<TableBlock>);
-  }
-  function setColWidth(c: number, w: number) {
-    const next = [...widths]; next[c] = w;
-    onChange({ colWidths: next } as Partial<TableBlock>);
-  }
-  function toggle(key: keyof TableBlock) {
-    onChange({ [key]: !block[key] } as Partial<TableBlock>);
+    onChange(tableOps.setCell(block, r, c, v) as Partial<TableBlock>);
   }
 
   const border = '1px solid var(--color-text)';
@@ -333,41 +296,6 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
   return (
     <BlockShell onDelete={onDelete} blockId={block.id}>
       <div style={{ margin: '8px 0' }}>
-        {/* rule + layout toggles */}
-        <div className="flex flex-wrap items-center gap-1 mb-2">
-          <button className={block.topRule ? activeBtn : ctrlBtn} onClick={() => toggle('topRule')}>top rule</button>
-          <button className={block.headerRule ? activeBtn : ctrlBtn} onClick={() => toggle('headerRule')}>header rule</button>
-          <button className={block.bottomRule ? activeBtn : ctrlBtn} onClick={() => toggle('bottomRule')}>bottom rule</button>
-          <button className={block.rowLines ? activeBtn : ctrlBtn} onClick={() => toggle('rowLines')}>row lines</button>
-          <button className={block.colLines ? activeBtn : ctrlBtn} onClick={() => toggle('colLines')}>col lines</button>
-          <button className={block.centered ? activeBtn : ctrlBtn} onClick={() => toggle('centered')}>center</button>
-        </div>
-
-        {/* column header controls: insert-left, delete, align, width, insert-right */}
-        <div className="flex gap-1 mb-1 items-end">
-          {Array.from({ length: cols }).map((_, c) => (
-            <div key={c} className="flex-1 flex flex-col items-center gap-0.5">
-              <div className="flex items-center gap-0.5">
-                <button className={miniBtn} title="Insert column left" onClick={() => insertCol(c)}>+</button>
-                <button className={miniBtn} title="Delete column" onClick={() => deleteCol(c)}>×</button>
-                {c === cols - 1 && <button className={miniBtn} title="Insert column right" onClick={() => insertCol(c + 1)}>+</button>}
-              </div>
-              <div className="flex gap-0.5">
-                {(['left', 'center', 'right'] as const).map((a) => (
-                  <button key={a} onClick={() => setColAlign(c, a)} title={`Align ${a}`}
-                    className={`text-[9px] px-1 rounded cursor-pointer border ${align[c] === a ? 'border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-transparent text-[var(--color-faint)]'}`}>
-                    {a[0].toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              <input type="number" min={0} max={100} value={widths[c] || ''} placeholder="auto"
-                onChange={(e) => setColWidth(c, parseInt(e.target.value, 10) || 0)}
-                title="Column width %"
-                className="w-12 text-[9px] px-1 py-0.5 border border-[var(--color-border)] rounded text-center bg-[var(--color-surface)] outline-none" />
-            </div>
-          ))}
-        </div>
-
         <table style={{ borderCollapse: 'collapse', width: '100%',
           margin: block.centered ? '0 auto' : undefined, tableLayout: widths.some((w) => w > 0) ? 'fixed' : 'auto' }}>
           <tbody>
@@ -378,19 +306,11 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
                   : (r > 0 && block.rowLines) ? '1px solid var(--color-border)' : undefined,
                 borderBottom: (r === block.rows.length - 1 && block.bottomRule) ? border : undefined,
               }}>
-                {/* row controls in a leading mini-cell */}
-                <td style={{ padding: 0, width: 18, verticalAlign: 'middle' }}>
-                  <div className="flex flex-col gap-0.5">
-                    <button className={miniBtn} title="Insert row above" onClick={() => insertRow(r)}>+</button>
-                    <button className={miniBtn} title="Delete row" onClick={() => deleteRow(r)}>×</button>
-                    {r === block.rows.length - 1 && <button className={miniBtn} title="Insert row below" onClick={() => insertRow(r + 1)}>+</button>}
-                  </div>
-                </td>
                 {row.map((cell, c) => (
                   <td key={c} style={{ padding: 0, borderLeft: c > 0 ? vline : undefined,
                     width: widths[c] > 0 ? `${widths[c]}%` : undefined }}>
                     <input value={cell} onChange={(e) => setCell(r, c, e.target.value)}
-                      onFocus={(e) => setActiveField({ el: e.currentTarget, setValue: (v) => setCell(r, c, v) })}
+                      onFocus={(e) => setActiveField({ el: e.currentTarget, setValue: (v) => setCell(r, c, v), meta: { blockId: block.id, row: r, col: c } })}
                       onBlur={() => setActiveField(null)}
                       style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 14,
                         padding: '6px 9px', fontWeight: r === 0 ? 600 : 400,

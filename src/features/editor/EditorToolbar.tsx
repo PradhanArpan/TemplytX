@@ -8,6 +8,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Bold, Italic, Superscript, Subscript, Sigma } from 'lucide-react';
 import { insertIntoActiveField } from './activeField';
+import { useClickOutside } from './useClickOutside';
 
 const SYMBOLS = [
   'α','β','γ','δ','ε','θ','λ','μ','π','σ','φ','ω','Δ','Σ','Ω',
@@ -17,7 +18,9 @@ const SYMBOLS = [
 export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
   const [showSymbols, setShowSymbols] = useState(false);
   const symBtnRef = useRef<HTMLButtonElement>(null);
+  const symMenuRef = useRef<HTMLDivElement>(null);
   const [symPos, setSymPos] = useState<{ top: number; left: number } | null>(null);
+  useClickOutside(showSymbols, [symBtnRef, symMenuRef], () => setShowSymbols(false));
   function toggleSymbols() {
     setShowSymbols((s) => {
       const next = !s;
@@ -71,7 +74,7 @@ export function EditorToolbar({ onAfter }: { onAfter?: () => void }) {
           onMouseDown={(e) => { e.preventDefault(); toggleSymbols(); }}
           onClick={(e) => { if (e.detail === 0) toggleSymbols(); }} className={btn} title="Insert symbol"><Sigma size={15} /></button>
         {showSymbols && symPos && createPortal(
-          <div id="editor-symbol-menu" role="menu" aria-label="Symbols"
+          <div ref={symMenuRef} id="editor-symbol-menu" role="menu" aria-label="Symbols"
             style={{ position: 'fixed', top: symPos.top, left: symPos.left, zIndex: 1000 }}
             className="w-[256px] p-2.5 bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-modal)] grid grid-cols-8 gap-1">
             {SYMBOLS.map((s) => (

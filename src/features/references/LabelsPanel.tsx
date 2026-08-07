@@ -56,7 +56,7 @@ export function LabelsPanel({ documentId, onPulled }: {
   }
 
   return (
-    <div className="mt-6">
+    <div>
       <div className="flex items-center justify-between mb-3">
         <span className="text-[12px] tracking-[0.06em] uppercase text-[var(--color-faint)] font-semibold">Labels</span>
         <button onClick={() => setAdding((v) => !v)} aria-label="New label"

@@ -217,7 +217,8 @@ ${pubLines.length ? `\\begin{enumerate}\n${pubLines.map((l) => `\\item ${texEsca
       const title = texEscape((b as { title: string }).title);
       if (lvl <= 1) { parts.push(`\\chapter{${title.toUpperCase()}}`); openedChapter = true; }
       else if (lvl === 2) { if (!openedChapter) { parts.push('\\chapter{INTRODUCTION}'); openedChapter = true; } parts.push(`\\section{${title}}`); }
-      else { if (!openedChapter) { parts.push('\\chapter{INTRODUCTION}'); openedChapter = true; } parts.push(`\\subsection{${title}}`); }
+      else if (lvl === 3) { if (!openedChapter) { parts.push('\\chapter{INTRODUCTION}'); openedChapter = true; } parts.push(`\\subsection{${title}}`); }
+      else { if (!openedChapter) { parts.push('\\chapter{INTRODUCTION}'); openedChapter = true; } parts.push(`\\subsubsection{${title}}`); }
     } else if (b.type === 'paragraph') {
       if (!openedChapter) { parts.push('\\chapter{INTRODUCTION}'); openedChapter = true; }
       parts.push(richToLatex(b.content, keyMap, refLabels, refKind) + '\n');

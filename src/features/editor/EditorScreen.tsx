@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical, PanelLeft, PanelRight, Redo2, Undo2, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, GripVertical, PanelLeft, Redo2, Undo2, X } from 'lucide-react';
 import { getDocument, updateDocument, listTemplates } from '../../services/documents';
 import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
 import { orderedReferences, markerMap, formatEntry, crossRefMap } from '../references/format';
 import { ReferencePanel } from '../references/ReferencePanel';
-import { LabelsPanel } from '../references/LabelsPanel';
 import { addReferenceToDocument } from '../../services/references';
 import type { TemplytXDocument, DocumentBlock, Reference } from '../../types/document';
 import type { Template, ComplianceReport } from '../../types/compliance';
 import { Button, Badge } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Card';
-import { ReadinessGauge } from '../../components/ui/ReadinessGauge';
 import { BlockView } from './blocks/BlockView';
 import { EditorToolbar } from './EditorToolbar';
 import { RefMenu } from './RefMenu';
+import { InsertMenu } from './InsertMenu';
+import { LabelsMenu } from './LabelsMenu';
+import { ReadinessMenu } from './ReadinessMenu';
+import { TableFormatMenu } from './TableFormatMenu';
+import { getActiveTableCell } from './activeField';
 import { FrontMatter } from './FrontMatter';
 import { ChristThesisForm, emptyChristMeta } from '../export/ChristThesisForm';
 import type { ChristThesisMeta } from '../../types/document';
@@ -37,10 +40,10 @@ function tokensFromEl(node: HTMLElement): string {
   return clone.innerHTML;
 }
 
-function newBlock(type: DocumentBlock['type'], title = ''): DocumentBlock {
+function newBlock(type: DocumentBlock['type'], title = '', level = 1): DocumentBlock {
   const id = `b-${crypto.randomUUID()}`;
   switch (type) {
-    case 'section': return { id, type, level: 1, title };
+    case 'section': return { id, type, level, title };
     case 'paragraph': return { id, type, content: '' };
     case 'equation': return { id, type, latex: '' };
     case 'figure': return { id, type, src: '', caption: '' };
@@ -62,14 +65,17 @@ export function EditorScreen() {
   const [stale, setStale] = useState(false);
   const [saved, setSaved] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [panel, setPanel] = useState<'left' | 'right' | null>(null);
+  const [panel, setPanel] = useState<'left' | null>(null);
   const [compactPanels, setCompactPanels] = useState(() => window.matchMedia('(max-width: 1199px)').matches);
   const [refKey, setRefKey] = useState(0); // bump to refresh the left ref panel
   const [christMeta, setChristMeta] = useState<ChristThesisMeta | null>(null);
   const [showChristForm, setShowChristForm] = useState(false);
   const [focusChapterId, setFocusChapterId] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
-  const [rightHidden, setRightHidden] = useState(false);
+  // The block to insert after when using the toolbar's Insert menu — whichever
+  // block was last focused/clicked, so insertion lands where you're working.
+  const [lastActiveBlockId, setLastActiveBlockId] = useState<string | null>(null);
+  const [activeTableCell, setActiveTableCell] = useState<{ blockId: string; row: number; col: number } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Undo/redo history for the blocks array. Rapid successive edits (typing)
   // within COALESCE_MS of each other collapse into one undo step, matching
@@ -80,7 +86,6 @@ export function EditorScreen() {
   const [historyCounts, setHistoryCounts] = useState({ past: 0, future: 0 });
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const leftPanel = useRef<HTMLElement | null>(null);
-  const rightPanel = useRef<HTMLElement | null>(null);
   // Tracks the last caret position inside a rich paragraph: the block id and
   // a cloned Range, so we can insert exactly there even after focus moves to
   // the reference panel (clicking the panel would otherwise lose the caret).
@@ -105,6 +110,17 @@ export function EditorScreen() {
     return () => document.removeEventListener('selectionchange', onSelChange);
   }, []);
 
+  // Reactively surface which table cell (if any) currently has focus, so the
+  // toolbar's Table menu — a sibling, not a descendant, of the table — knows
+  // what to act on. activeField itself is a plain module singleton; 'focusin'
+  // fires on every focus change app-wide, including focus leaving a table
+  // cell for something else, so a single listener keeps this in sync.
+  useEffect(() => {
+    function sync() { setActiveTableCell(getActiveTableCell()); }
+    document.addEventListener('focusin', sync);
+    return () => document.removeEventListener('focusin', sync);
+  }, []);
+
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1199px)');
     const sync = () => {
@@ -118,7 +134,7 @@ export function EditorScreen() {
 
   useEffect(() => {
     if (!panel || !compactPanels) return;
-    const container = panel === 'left' ? leftPanel.current : rightPanel.current;
+    const container = leftPanel.current;
     if (!container) return;
 
     const focusable = () => [...container.querySelectorAll<HTMLElement>(
@@ -278,11 +294,19 @@ export function EditorScreen() {
   }
 
   /** Insert a new block at a given index (default: end). */
-  function insertBlock(type: DocumentBlock['type'], at?: number) {
-    const b = newBlock(type);
+  function insertBlock(type: DocumentBlock['type'], at?: number, level?: number) {
+    const b = newBlock(type, '', level);
     const next = [...blocks];
     next.splice(at ?? next.length, 0, b);
     applyBlocks(next, { coalesce: false });
+  }
+
+  /** Insert right after whichever block was last focused/clicked (the
+   *  toolbar's Insert menu doesn't know a document position on its own),
+   *  falling back to the end of the document. */
+  function insertBlockAt(type: DocumentBlock['type'], level?: number) {
+    const idx = lastActiveBlockId ? blocks.findIndex((b) => b.id === lastActiveBlockId) : -1;
+    insertBlock(type, idx === -1 ? blocks.length : idx + 1, level);
   }
 
   /** Drag reorder: move dragged block to before the drop target. */
@@ -398,10 +422,9 @@ export function EditorScreen() {
 
   if (!doc) {
     return (
-      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[232px_1fr_288px] h-[calc(100dvh-56px)]">
+      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[232px_1fr] h-[calc(100dvh-56px)]">
         <div className="hidden min-[1200px]:block border-r border-[var(--color-border)] p-5"><Skeleton className="h-5 w-24 mb-4" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-3/4" /></div>
         <div className="p-6 sm:p-10"><Skeleton className="h-7 w-2/3 mb-6" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></div>
-        <div className="hidden min-[1200px]:flex border-l border-[var(--color-border)] p-5 flex-col items-center"><Skeleton className="h-28 w-28 rounded-full mb-4" /><Skeleton className="h-9 w-full" /></div>
       </div>
     );
   }
@@ -453,11 +476,7 @@ export function EditorScreen() {
               {saved ? 'Saved' : 'Saving…'}
             </motion.span>
           </AnimatePresence>
-          <button type="button" onClick={() => setRightHidden((v) => !v)}
-            className="hidden min-[1200px]:inline-flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-[var(--radius)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text)] cursor-pointer"
-            title={rightHidden ? 'Show readiness & labels panel' : 'Hide panel for more writing space'}>
-            <PanelRight size={13} /> {rightHidden ? 'Show panel' : 'Hide panel'}
-          </button>
+          <ReadinessMenu score={score} stale={stale} tpl={tpl} report={report} onCheck={checkCompliance} onGoToBlock={goToBlock} />
           <Button variant="secondary" size="sm" onClick={() => navigate(`/doc/${id}/export`)}>Export</Button>
         </div>
       </div>
@@ -476,23 +495,21 @@ export function EditorScreen() {
             <Redo2 size={15} />
           </button>
         </div>
+        <LabelsMenu documentId={id!} onPulled={() => setRefKey((k) => k + 1)} />
         <EditorToolbar onAfter={() => {
           const el = document.activeElement as HTMLElement | null;
           if (el && el.getAttribute('contenteditable') === 'true') {
             el.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }} />
+        <InsertMenu onInsert={(type, level) => insertBlockAt(type, level)} />
+        <TableFormatMenu blocks={blocks} activeCell={activeTableCell} patchBlock={patchBlock} />
         <RefMenu blocks={blocks} onPick={(refId) => insertXref(refId)} />
         <div className="flex items-center gap-1.5 ml-auto min-[1200px]:hidden">
           <button type="button" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel('left'); }}
             aria-label="Open outline and references" aria-expanded={panel === 'left'} aria-controls="editor-left-panel"
             className="flex min-h-8 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors">
             <PanelLeft size={14} /><span className="hidden sm:inline">Outline</span>
-          </button>
-          <button type="button" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel('right'); }}
-            aria-label="Open readiness and labels" aria-expanded={panel === 'right'} aria-controls="editor-right-panel"
-            className="flex min-h-8 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium px-2.5 py-1.5 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] text-[var(--color-text)] cursor-pointer hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-raised)] transition-colors">
-            <PanelRight size={14} /><span className="hidden sm:inline">Readiness</span>
           </button>
         </div>
       </div>
@@ -502,7 +519,7 @@ export function EditorScreen() {
           className="fixed inset-x-0 top-14 bottom-0 z-40 bg-[#0b1220]/45 backdrop-blur-[2px] border-none min-[1200px]:hidden" />
       )}
 
-      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[232px_1fr_288px] flex-1 min-h-0 min-w-0">
+      <div className="grid grid-cols-1 min-[1200px]:grid-cols-[232px_1fr] flex-1 min-h-0 min-w-0">
         {/* left: outline + reference pool */}
         <aside id="editor-left-panel" ref={leftPanel}
           inert={compactPanels && panel !== 'left'} aria-hidden={compactPanels && panel !== 'left'}
@@ -599,14 +616,13 @@ export function EditorScreen() {
                 </button>
               </div>
             )}
-            {blocks.map((b, i) => (
+            {blocks.map((b) => (
               focusVisibleIds && !focusVisibleIds.has(b.id) ? null : (
               <div key={b.id}
+                onFocusCapture={() => setLastActiveBlockId(b.id)}
                 onDragOver={(e) => { if (dragId) e.preventDefault(); }}
                 onDrop={() => onDrop(b.id)}
                 className={dragId && dragId !== b.id ? 'border-t-2 border-transparent hover:border-[var(--color-accent)]' : ''}>
-                {/* insert-between affordance */}
-                <InsertBar onInsert={(t) => insertBlock(t, i)} />
                 <div className="flex items-start gap-1 group/row">
                   <button
                     draggable onDragStart={() => setDragId(b.id)} onDragEnd={() => setDragId(null)}
@@ -632,8 +648,6 @@ export function EditorScreen() {
               )
             ))}
 
-            <InsertBar onInsert={(t) => insertBlock(t)} always />
-
             {/* auto-generated reference section */}
             {refList.length > 0 && (
               <div className="mt-8 pt-4 border-t border-[var(--color-border)]">
@@ -652,73 +666,6 @@ export function EditorScreen() {
             )}
           </div>
         </section>
-
-        {/* right: readiness */}
-        <aside id="editor-right-panel" ref={rightPanel}
-          inert={compactPanels && panel !== 'right'} aria-hidden={compactPanels && panel !== 'right'}
-          role={compactPanels && panel === 'right' ? 'dialog' : undefined} aria-modal={compactPanels && panel === 'right' ? true : undefined}
-          aria-label="Readiness and labels" className={`border-l border-[var(--color-border)] px-4 py-5 bg-[var(--color-surface-2)] overflow-y-auto
-          ${rightHidden ? 'min-[1200px]:hidden' : 'min-[1200px]:static min-[1200px]:z-auto min-[1200px]:w-auto min-[1200px]:translate-x-0'}
-          max-[1200px]:fixed max-[1200px]:top-14 max-[1200px]:bottom-0 max-[1200px]:right-0 max-[1200px]:z-50
-          max-[1200px]:w-[min(340px,calc(100vw-48px))] max-[1200px]:transition-transform max-[1200px]:duration-200 max-[1200px]:shadow-[var(--shadow-modal)]
-          ${panel === 'right' ? 'max-[1200px]:translate-x-0' : 'max-[1200px]:translate-x-full'}`}>
-          <div className="flex items-center justify-between mb-4 min-[1200px]:hidden">
-            <span className="font-medium">Readiness and labels</span>
-            <button type="button" onClick={closePanel} aria-label="Close readiness and labels"
-              className="p-2 rounded-[var(--radius)] text-[var(--color-muted)] border-none bg-transparent cursor-pointer">
-              <X size={17} />
-            </button>
-          </div>
-          <div className={paneLabel}>Readiness</div>
-          <div className="flex flex-col items-center gap-3">
-            <ReadinessGauge score={score} stale={stale && score !== null} />
-            <AnimatePresence>
-              {stale && score !== null && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <Badge tone="partial">Edited since last check</Badge>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          <Button variant="primary" className="w-full mt-4" onClick={checkCompliance} disabled={!tpl}>
-            {score === null ? 'Check compliance' : 'Re-check'}
-          </Button>
-          {!tpl && <div className="text-[12px] text-[var(--color-faint)] mt-2">Choose a template on the dashboard to enable checks.</div>}
-
-          <AnimatePresence>
-            {report && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <div className="mt-5 mb-2 text-[13px] text-[var(--color-muted)] flex items-center gap-1.5">
-                  {report.issues.length === 0
-                    ? <><CircleCheck size={14} className="text-[var(--status-ready)]" /> No issues — ready to submit</>
-                    : `${report.issues.length} issue${report.issues.length === 1 ? '' : 's'}`}
-                </div>
-                <motion.div className="flex flex-col gap-2" initial="hidden" animate="show"
-                  variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}>
-                  {report.issues.map((issue) => (
-                    <motion.div key={issue.id} variants={{ hidden: { opacity: 0, x: 8 }, show: { opacity: 1, x: 0 } }}
-                      transition={{ duration: 0.2 }}
-                      className="border border-[var(--color-border)] rounded-[var(--radius)] p-2.5 flex gap-2 items-start justify-between bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
-                      <div className="flex gap-2 items-start min-w-0">
-                        <CircleAlert size={14} className="shrink-0 mt-0.5"
-                          style={{ color: issue.severity === 'error' ? 'var(--status-error)' : 'var(--status-partial)' }} />
-                        <span className="text-[12px] text-[var(--color-text)] leading-snug">{issue.message}</span>
-                      </div>
-                      {issue.targetBlockId && (
-                        <button onClick={() => goToBlock(issue.targetBlockId)}
-                          className="shrink-0 flex items-center gap-1 text-[12px] text-[var(--color-accent)] cursor-pointer border border-[var(--color-accent-bg)] rounded-md px-2 py-0.5 bg-transparent hover:bg-[var(--color-accent-bg)] transition-colors">
-                          <Crosshair size={11} /> Go
-                        </button>
-                      )}
-                    </motion.div>
-                  ))}
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <LabelsPanel documentId={id!} onPulled={() => setRefKey((k) => k + 1)} />
-        </aside>
       </div>
 
       {showChristForm && christMeta && (
@@ -736,57 +683,6 @@ export function EditorScreen() {
                 className="text-[13px] px-4 py-2 rounded-[var(--radius)] bg-[var(--color-accent)] text-white cursor-pointer border-none">Done</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** A slim insert affordance between blocks: hover reveals block-type buttons. */
-function InsertBar({ onInsert, always = false }: {
-  onInsert: (t: DocumentBlock['type']) => void; always?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const items = [['paragraph', 'Text'], ['section', 'Section'], ['equation', 'Equation'],
-    ['figure', 'Figure'], ['table', 'Table']] as const;
-
-  if (always) {
-    // Persistent, prominent "add content" toolbar at the end of the document.
-    return (
-      <div className="mt-8 pt-5 border-t border-dashed border-[var(--color-border-strong)]">
-        <div className="text-[11px] uppercase tracking-[0.06em] text-[var(--color-faint)] font-semibold mb-2">
-          Add content
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {items.map(([type, label]) => (
-            <button key={type} onClick={() => onInsert(type)}
-              className="flex min-h-9 items-center gap-1.5 text-[13px] font-medium text-[var(--color-text)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-3 py-1.5 bg-[var(--color-surface-2)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-bg)] transition-colors">
-              <span className="text-[var(--color-accent)] font-semibold">+</span> {label}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Between-blocks inserter: a hoverable gap that reveals a + and buttons.
-  return (
-    <div className="relative h-5 flex items-center justify-center group/ins"
-      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      {open ? (
-        <div className="flex gap-1.5 flex-wrap py-1 px-2 bg-[var(--color-bg)] z-10 rounded">
-          {items.map(([type, label]) => (
-            <button key={type} onClick={() => onInsert(type)}
-              className="text-[11px] text-[var(--color-muted)] cursor-pointer border border-[var(--color-border)] rounded-[var(--radius)] px-2.5 py-0.5 bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors">
-              + {label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="w-full flex items-center justify-center">
-          <div className="flex-1 h-px group-hover/ins:bg-[var(--color-border)] transition-colors" />
-          <span className="opacity-0 group-hover/ins:opacity-100 transition-opacity text-[var(--color-faint)] text-[11px] px-2 shrink-0">+ insert</span>
-          <div className="flex-1 h-px group-hover/ins:bg-[var(--color-border)] transition-colors" />
         </div>
       )}
     </div>

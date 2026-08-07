@@ -88,7 +88,8 @@ export function buildKmea(doc: TemplytXDocument): string {
         openedChapter = true;
       } else if (lvl <= 1) { parts.push(`\\chapter{${title}}`); openedChapter = true; }
       else if (lvl === 2) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\section{${title}}`); }
-      else { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsection{${title}}`); }
+      else if (lvl === 3) { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsection{${title}}`); }
+      else { if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; } parts.push(`\\subsubsection{${title}}`); }
     } else if (b.type === 'paragraph') {
       if (!openedChapter) { parts.push('\\chapter{Introduction}'); openedChapter = true; }
       parts.push(richToLatex(b.content, keyMap, refLabels, refKind) + '\n');
