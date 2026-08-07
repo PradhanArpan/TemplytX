@@ -16,17 +16,21 @@ import { listReferencesSync } from '../../services/references';
 
 const lineMap = { single: 240, onehalf: 360, double: 480 };
 
+type RunFmt = { bold?: boolean; italics?: boolean; superScript?: boolean; subScript?: boolean };
+
 /** Convert a rich-text HTML string into docx TextRuns, preserving
- *  bold/italic/superscript/subscript. Citations already resolved to text. */
-function htmlToRuns(html: string, size: number): TextRun[] {
+ *  bold/italic/superscript/subscript. Citations already resolved to text.
+ *  `baseFmt` seeds the starting format (e.g. force-bold a table header row);
+ *  nested tags compose with it rather than replacing it. */
+function htmlToRuns(html: string, size: number, baseFmt: RunFmt = {}): TextRun[] {
   const runs: TextRun[] = [];
   if (typeof document === 'undefined') {
     // SSR/Node fallback: strip tags.
-    return [new TextRun({ text: html.replace(/<[^>]+>/g, ''), size })];
+    return [new TextRun({ text: html.replace(/<[^>]+>/g, ''), size, ...baseFmt })];
   }
   const container = document.createElement('div');
   container.innerHTML = html;
-  const walk = (node: Node, fmt: { bold?: boolean; italics?: boolean; superScript?: boolean; subScript?: boolean }) => {
+  const walk = (node: Node, fmt: RunFmt) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === Node.TEXT_NODE) {
         const text = child.textContent ?? '';
@@ -43,8 +47,8 @@ function htmlToRuns(html: string, size: number): TextRun[] {
       }
     });
   };
-  walk(container, {});
-  return runs.length ? runs : [new TextRun({ text: '', size })];
+  walk(container, baseFmt);
+  return runs.length ? runs : [new TextRun({ text: '', size, ...baseFmt })];
 }
 
 export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
@@ -138,7 +142,7 @@ export async function exportDocx(doc: TemplytXDocument, tpl: Template) {
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: b.rows.map((r, ri) => new TableRow({
           children: r.map((c) => new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: c, bold: ri === 0, size: half - 2 })] })],
+            children: [new Paragraph({ children: htmlToRuns(c, half - 2, ri === 0 ? { bold: true } : {}) })],
           })),
         })),
       }));

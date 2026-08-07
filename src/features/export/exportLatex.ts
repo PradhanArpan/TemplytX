@@ -213,6 +213,7 @@ export function buildLatex(doc: TemplytXDocument, tpl: Template, mode: LatexMode
         // Wide tables span both columns in two-column journal layouts.
         return formatTable(b, {
           label: lbl, esc: texEscape,
+          cellToLatex: (html) => richToLatex(html, keyMap, refLabels, refKind),
           wideFloat: twoCol && (b.rows[0]?.length ?? 1) >= 3,
         });
       }

@@ -102,7 +102,10 @@ export function buildKmea(doc: TemplytXDocument): string {
       const width = b.width && b.width < 100 ? (b.width / 100).toFixed(2) : '0.8';
       parts.push(`\\begin{figure}[htbp]\n\\centering\n${localImg(b.src, `${width}\\linewidth`)}\n\\caption{${cap}}\\label{${refLabels.get(b.id)}}\n\\end{figure}`);
     } else if (b.type === 'table') {
-      parts.push(formatTable(b, { label: refLabels.get(b.id), esc: texEscape }));
+      parts.push(formatTable(b, {
+        label: refLabels.get(b.id), esc: texEscape,
+        cellToLatex: (html) => richToLatex(html, keyMap, refLabels, refKind),
+      }));
     }
   }
   const body = parts.join('\n\n') || '\\chapter{Introduction}\n';

@@ -3,12 +3,12 @@
  * Each block renders as an editable element in the author's serif.
  * Equations render live with KaTeX (click to edit, blur to render).
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { RichParagraph } from './RichParagraph';
-import { setActiveField } from '../activeField';
+import { setActiveTableCell } from '../activeField';
 import { useClickOutside } from '../useClickOutside';
 import * as tableOps from '../tableOps';
 import { ImageInput } from './ImageInput';
@@ -283,6 +283,39 @@ export function FigureView({ block, onChange, onDelete }: BlockProps<FigureBlock
   );
 }
 
+/** A table cell: contenteditable so Bold/Italic/Superscript/Subscript from
+ *  the shared toolbar (execCommand) work here, same as a rich paragraph. */
+function RichCell({ html, style, onChange, onFocusCell, onBlurCell }: {
+  html: string;
+  style: React.CSSProperties;
+  onChange: (html: string) => void;
+  onFocusCell: () => void;
+  onBlurCell: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.innerHTML = html;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Re-sync from the `html` prop whenever it changes externally (undo/redo)
+    // — only while unfocused, so we never clobber the caret mid-keystroke.
+    const el = ref.current;
+    if (el && document.activeElement !== el) el.innerHTML = html;
+  }, [html]);
+
+  function emit() { if (ref.current) onChange(ref.current.innerHTML); }
+
+  return (
+    <div ref={ref} contentEditable suppressContentEditableWarning
+      onInput={emit} onFocus={onFocusCell} onBlur={onBlurCell}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+      style={{ ...bare, width: 'auto', minHeight: '1.4em', outline: 'none', ...style }} />
+  );
+}
+
 export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>) {
   const align = block.align ?? Array(block.rows[0]?.length ?? 0).fill('left');
   const widths = block.colWidths ?? Array(block.rows[0]?.length ?? 0).fill(0);
@@ -309,10 +342,10 @@ export function TableView({ block, onChange, onDelete }: BlockProps<TableBlock>)
                 {row.map((cell, c) => (
                   <td key={c} style={{ padding: 0, borderLeft: c > 0 ? vline : undefined,
                     width: widths[c] > 0 ? `${widths[c]}%` : undefined }}>
-                    <input value={cell} onChange={(e) => setCell(r, c, e.target.value)}
-                      onFocus={(e) => setActiveField({ el: e.currentTarget, setValue: (v) => setCell(r, c, v), meta: { blockId: block.id, row: r, col: c } })}
-                      onBlur={() => setActiveField(null)}
-                      style={{ ...bare, fontFamily: 'var(--font-document)', fontSize: 14,
+                    <RichCell html={cell} onChange={(v) => setCell(r, c, v)}
+                      onFocusCell={() => setActiveTableCell({ blockId: block.id, row: r, col: c })}
+                      onBlurCell={() => setActiveTableCell(null)}
+                      style={{ fontFamily: 'var(--font-document)', fontSize: 14,
                         padding: '6px 9px', fontWeight: r === 0 ? 600 : 400,
                         textAlign: align[c] ?? 'left' }} />
                   </td>

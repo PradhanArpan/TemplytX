@@ -26,6 +26,9 @@ export interface TableOptions {
   label?: string;
   /** escape function from the calling exporter (keeps escaping consistent). */
   esc: (s: string) => string;
+  /** Convert a cell's rich HTML (bold/italic/sup/sub) to LaTeX. Defaults to
+   *  plain `esc()` if omitted (e.g. for callers with no rich cells). */
+  cellToLatex?: (html: string) => string;
   /** Force full-width float (e.g. table* in two-column journal layouts). */
   wideFloat?: boolean;
   /** Bold the header row (default true). */
@@ -47,10 +50,12 @@ export function formatTable(t: TableLike, opts: TableOptions): string {
     return a === 'center' ? 'c' : a === 'right' ? 'r' : 'l';
   };
 
-  // Header bold by default; other cells plain (rich per-cell comes later).
+  // Header bold by default; other cells render through cellToLatex if the
+  // caller supplied one (rich bold/italic/sup/sub), else plain esc().
+  const renderCell = opts.cellToLatex ?? esc;
   const bodyRows = t.rows.map((row, ri) => {
     const cells = row.map((c) => {
-      const e = esc(c);
+      const e = renderCell(c);
       return ri === 0 && boldHeader ? `\\textbf{${e}}` : e;
     });
     let line = '    ' + cells.join(' & ') + ' \\\\';
