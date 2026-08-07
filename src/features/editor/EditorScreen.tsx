@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical, PanelLeft, PanelRight, X } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, Crosshair, GripVertical, PanelLeft, PanelRight, Redo2, Undo2, X } from 'lucide-react';
 import { getDocument, updateDocument, listTemplates } from '../../services/documents';
 import { listReferences } from '../../services/references';
 import { runCompliance } from '../compliance/engine';
@@ -71,6 +71,13 @@ export function EditorScreen() {
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
   const [rightHidden, setRightHidden] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Undo/redo history for the blocks array. Rapid successive edits (typing)
+  // within COALESCE_MS of each other collapse into one undo step, matching
+  // how word processors group keystrokes rather than undoing one char at a
+  // time; structural edits (insert/delete/move/drag) always start a new step.
+  const historyRef = useRef<{ past: DocumentBlock[][]; future: DocumentBlock[][] }>({ past: [], future: [] });
+  const lastEditRef = useRef(0);
+  const [historyCounts, setHistoryCounts] = useState({ past: 0, future: 0 });
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const leftPanel = useRef<HTMLElement | null>(null);
   const rightPanel = useRef<HTMLElement | null>(null);
@@ -178,7 +185,9 @@ export function EditorScreen() {
     if (id) updateDocument(id, patch).then(() => setSaved(true));
   }, [id, docTitle]);
 
-  const applyBlocks = useCallback((next: DocumentBlock[]) => {
+  const COALESCE_MS = 600;
+
+  const persistBlocks = useCallback((next: DocumentBlock[]) => {
     setBlocks(next);
     setStale(true);
     setSaved(false);
@@ -188,6 +197,48 @@ export function EditorScreen() {
       setSaved(true);
     }, 800);
   }, [id]);
+
+  /** Apply a new blocks array. Pass `coalesce: false` for structural changes
+   *  (insert/delete/move/drag) so they always create a discrete undo step. */
+  const applyBlocks = useCallback((next: DocumentBlock[], opts?: { coalesce?: boolean }) => {
+    const now = Date.now();
+    const coalesce = (opts?.coalesce ?? true) && now - lastEditRef.current < COALESCE_MS;
+    if (!coalesce) historyRef.current.past.push(blocks);
+    historyRef.current.future = [];
+    lastEditRef.current = now;
+    setHistoryCounts({ past: historyRef.current.past.length, future: 0 });
+    persistBlocks(next);
+  }, [blocks, persistBlocks]);
+
+  function undo() {
+    const h = historyRef.current;
+    if (h.past.length === 0) return;
+    const previous = h.past.pop()!;
+    h.future.push(blocks);
+    lastEditRef.current = 0;
+    setHistoryCounts({ past: h.past.length, future: h.future.length });
+    persistBlocks(previous);
+  }
+  function redo() {
+    const h = historyRef.current;
+    if (h.future.length === 0) return;
+    const next = h.future.pop()!;
+    h.past.push(blocks);
+    lastEditRef.current = 0;
+    setHistoryCounts({ past: h.past.length, future: h.future.length });
+    persistBlocks(next);
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) { event.preventDefault(); undo(); }
+      else if (key === 'y' || (key === 'z' && event.shiftKey)) { event.preventDefault(); redo(); }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  });
 
   function patchBlock(blockId: string, patch: Partial<DocumentBlock>) {
     // Key-based citing: if the user typed \cite{key}, resolve it against the
@@ -209,7 +260,7 @@ export function EditorScreen() {
     }
     applyBlocks(blocks.map((b) => (b.id === blockId ? { ...b, ...patch } as DocumentBlock : b)));
   }
-  function deleteBlock(blockId: string) { applyBlocks(blocks.filter((b) => b.id !== blockId)); }
+  function deleteBlock(blockId: string) { applyBlocks(blocks.filter((b) => b.id !== blockId), { coalesce: false }); }
 
   function saveTitle(t: string) {
     setDocTitle(t); setSaved(false);
@@ -231,7 +282,7 @@ export function EditorScreen() {
     const b = newBlock(type);
     const next = [...blocks];
     next.splice(at ?? next.length, 0, b);
-    applyBlocks(next);
+    applyBlocks(next, { coalesce: false });
   }
 
   /** Drag reorder: move dragged block to before the drop target. */
@@ -243,7 +294,7 @@ export function EditorScreen() {
     const next = [...blocks];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
-    applyBlocks(next);
+    applyBlocks(next, { coalesce: false });
     setDragId(null);
   }
 
@@ -254,7 +305,7 @@ export function EditorScreen() {
     const next = [...blocks];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
-    applyBlocks(next);
+    applyBlocks(next, { coalesce: false });
   }
 
   /** Cite a reference: insert [[cite:id]] at the cursor in the focused paragraph. */
@@ -413,6 +464,18 @@ export function EditorScreen() {
 
       {/* Shared formatting toolbar (Word-like) — acts on the focused block. */}
       <div className="flex items-center gap-2 px-3 sm:px-5 h-[48px] shrink-0 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+        <div className="flex items-center gap-0.5 px-1.5 py-1 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
+          <button type="button" aria-label="Undo" onClick={undo} disabled={historyCounts.past === 0}
+            title="Undo (Ctrl+Z)"
+            className="min-h-7 min-w-7 inline-flex items-center justify-center rounded-md cursor-pointer text-[var(--color-muted)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] transition-colors border-none bg-transparent disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]">
+            <Undo2 size={15} />
+          </button>
+          <button type="button" aria-label="Redo" onClick={redo} disabled={historyCounts.future === 0}
+            title="Redo (Ctrl+Y)"
+            className="min-h-7 min-w-7 inline-flex items-center justify-center rounded-md cursor-pointer text-[var(--color-muted)] hover:bg-[var(--color-accent-bg)] hover:text-[var(--color-accent)] transition-colors border-none bg-transparent disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]">
+            <Redo2 size={15} />
+          </button>
+        </div>
         <EditorToolbar onAfter={() => {
           const el = document.activeElement as HTMLElement | null;
           if (el && el.getAttribute('contenteditable') === 'true') {

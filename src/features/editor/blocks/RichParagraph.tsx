@@ -46,11 +46,14 @@ export function RichParagraph({ html, markers, crossRefs, onChange, onFocusCurso
 
   useEffect(() => {
     const el = ref.current;
+    // Re-sync from the `html` prop whenever it changes externally (undo/redo,
+    // citation updates) — but only while unfocused, so we never clobber the
+    // caret mid-keystroke. While focused, our own onInput is the source of
+    // truth and `html` merely echoes back what we just typed.
     if (el && document.activeElement !== el) {
-      el.innerHTML = tokensToChips(chipsToTokens(el), markers, crossRefs);
+      el.innerHTML = tokensToChips(html, markers, crossRefs);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markers, crossRefs]);
+  }, [html, markers, crossRefs]);
 
   function emit() { if (ref.current) onChange(chipsToTokens(ref.current)); }
 
