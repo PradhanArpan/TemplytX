@@ -60,10 +60,17 @@ Blocks: `section` (has `level`: 1=chapter, 2=section, 3=subsection,
 articles don't need 4 heading tiers), `paragraph` (rich HTML-ish string),
 `equation` (LaTeX), `figure`, `table` (rows: string[][] — each cell is rich
 HTML like a paragraph, not plain text; align, topRule/headerRule/bottomRule,
-colWidths…). `TemplytXDocument` also has `christThesis?: ChristThesisMeta`
-(persisted in a `christ_thesis jsonb` column).
+colWidths…). `section`/`figure`/`table`/`equation` all also have an optional
+`unnumbered?: boolean` (starred/uncounted — `\chapter*`, `\caption*`,
+`equation*`; excluded from cross-referencing). `TemplytXDocument` also has
+`christThesis?: ChristThesisMeta` (persisted in a `christ_thesis jsonb`
+column).
 
 ## Exporters (`src/features/export/`)
+Five export paths, all driven by the same `TemplytXDocument`: `exportLatex.ts`
+(.tex), `exportChristThesis.ts` (.tex), `exportKmea.ts` (.tex), `exportDocx.ts`
+(.docx), and `exportHtml.ts` (browser print-to-PDF, via `window.print()` —
+easy to forget since it's not one of the three LaTeX exporters).
 - `exportLatex.ts` — generic/journal (ieee/springer/elsevier/article). Has
   `UNICODE_MAP` + `unicodeToLatex` (β→$\beta$, ₹→\rupee{}, etc.) so pdflatex
   doesn't choke on Unicode. Submission vs camera-ready modes.
@@ -75,7 +82,9 @@ colWidths…). `TemplytXDocument` also has `christThesis?: ChristThesisMeta`
   this target. Glossary + Publications are generated from form fields.
 - `exportKmea.ts` — KMEA report; uses bundled `kmeareport.sty` (Times New Roman
   via fontspec → XeLaTeX). Native Unicode, so NO conversion. Front-matter titles
-  (Foreword/Acknowledgement/Executive Summary/etc.) become UNNUMBERED chapters.
+  (Foreword/Acknowledgement/Executive Summary/etc.) become UNNUMBERED chapters
+  (name-matched via a `FRONT` regex — kept for backward compat alongside the
+  explicit `unnumbered` field below).
 - `formatTable.ts` — SHARED table formatter used by ALL exporters: header row
   bold by default; 3+ cols auto-fit \textwidth via tabularx with wrapping; 6+
   cols → landscape; narrow tables compact; alignment preserved. Preambles must
@@ -83,11 +92,35 @@ colWidths…). `TemplytXDocument` also has `christThesis?: ChristThesisMeta`
   so each exporter converts rich cell HTML (bold/italic/sup/sub) through its
   own local `richToLatex` — kept local per exporter ON PURPOSE (KMEA's version
   skips Unicode→LaTeX conversion since XeLaTeX renders Unicode natively); do
-  NOT extract a shared richToLatex module.
+  NOT extract a shared richToLatex module. Also takes `unnumbered?: boolean`
+  (from the table block) to emit `\caption*` instead of `\caption`+`\label`.
 - `exportDocx.ts` — Word export. `htmlToRuns(html, size, baseFmt?)` walks rich
   HTML (paragraphs AND table cells) into bold/italic/superscript/subscript
   TextRuns; `baseFmt` seeds a forced format (e.g. table header row bold) that
   composes with any nested tags rather than overriding them.
+- `exportHtml.ts` — table cells here are still plain-text escaped (`esc(c)`),
+  NOT rich HTML like the other four exporters. Known gap, not yet fixed.
+
+### Figure/Table/Equation numbering (`numbering.ts`, `numberingPref.ts`)
+- `computeNumbering(blocks, numberSections, style)` is the single source of
+  truth, reused by the editor's own cross-ref markers (`references/format.ts`'s
+  `crossRefData`/`crossRefMap`) AND `exportDocx.ts`/`exportHtml.ts`. Blocks with
+  `unnumbered: true` get no map entry at all — that's what excludes them from
+  the `\ref` picker (`RefMenu.tsx`) automatically, no separate filtering needed.
+- `style: 'continuous' | 'byChapter'` — byChapter resets figure/table/equation
+  counters at each (non-unnumbered) level-1 section, producing `"2.1"`-style
+  strings. Toggle lives in the editor toolbar's `NumberingMenu.tsx`, shown only
+  when the doc has a chapter; persisted session-only via `numberingPref.ts`
+  (localStorage keyed per document id — NOT a Supabase column; a real DB column
+  is the planned upgrade path, see that file's comment).
+- IMPORTANT gotcha for the two `\chapter`-based exporters (`exportChristThesis.ts`
+  uses `book`, `exportKmea.ts` uses `report`): those LaTeX kernel classes
+  ALREADY reset Figure/Table counters per chapter by default — only Equation
+  numbering is continuous by default. So `'continuous'` emits nothing extra
+  (preserves that existing mixed behavior exactly); `'byChapter'` adds exactly
+  one line, `\numberwithin{equation}{chapter}`, to bring equations in line.
+  `exportLatex.ts` (`article` class, no `\chapter`) treats the style as a
+  documented no-op.
 
 ### Architectural rule (permanent)
 Use the citation package/style of the RESPECTIVE document class/template. Do NOT
@@ -111,10 +144,18 @@ force-load a generic `cite` package on classes that manage citations themselves
   `EditorToolbar.tsx` (Bold/Italic/Sup/Sub/Symbol), `InsertMenu.tsx`
   (Chapter/Section/Subsection/Sub-subsection/Text/Equation/Figure/Table —
   inserts right after whichever block was last focused; replaced the old
-  in-document hover "+insert" bar and bottom "Add content" bar entirely),
-  `TableFormatMenu.tsx` (row/col insert-delete, align, width, rule toggles —
-  enabled only while a table cell is focused; `tableOps.ts` holds the pure
-  mutation helpers it and nothing else needs), `RefMenu.tsx` ("Insert \ref").
+  in-document hover "+insert" bar and bottom "Add content" bar entirely; has
+  one "*" unnumbered toggle at the top of the dropdown that applies to
+  whatever's picked next — NOT duplicated per item), `TableFormatMenu.tsx`
+  (row/col insert-delete, align, width, rule toggles, plus an "Unnumbered"
+  style toggle — enabled only while a table cell is focused; `tableOps.ts`
+  holds the pure mutation helpers it and nothing else needs),
+  `NumberingMenu.tsx` (Continuous/By-chapter, only shown when the doc has a
+  chapter — see numbering section below), `RefMenu.tsx` ("\ref", renamed from
+  "Insert \ref").
+- Section/Equation/Figure blocks each have their own small "*" toggle inline
+  (next to the level badge / label input / control row respectively) to flip
+  `unnumbered` after insertion — same underlying field `InsertMenu` sets.
 - All dropdowns/popovers render as PORTALS to document.body (the toolbar has
   `overflow-x-auto`, which clips descendants — z-index alone can't escape it)
   and close on outside click via `useClickOutside.ts`.
@@ -132,12 +173,24 @@ force-load a generic `cite` package on classes that manage citations themselves
 - Sections have 4 heading levels via in-block ◄►arrows (Chapter/Section/
   Subsection/Sub-subsection); `InsertMenu` also inserts a heading at a chosen
   level directly.
+- `FrontMatter.tsx` takes a `showAuthors` prop — the author list + "+ Add
+  author" + corresponding-author note are hidden for non-journal template
+  types (thesis/report/proposal/lab-report/cv/project; CHRIST thesis doesn't
+  use `FrontMatter` at all, it has its own `ChristThesisForm`). Title input
+  always shows. `EditorScreen.tsx` passes `showAuthors={!tpl || tpl.type ===
+  'journal'}` — template-less "Article (neutral)" docs keep authors visible.
 
 ## Known / deferred
 - Springer sn-jnl.cls isn't in MiKTeX → journal-zip upload feature planned.
 - Batch 4 on hold: image storage/cloud/cleanup; multi-user sharing + realtime
   collaboration (the biggest unbuilt item — sharing-with-sync-on-save is nearer
   term than true simultaneous editing).
+- `exportHtml.ts` table cells are plain-text only (not rich HTML like the
+  other four export paths) — found but not fixed while adding rich table
+  cells elsewhere.
+- Chapter-based numbering choice is session-only (localStorage per doc id,
+  `numberingPref.ts`) — a real Supabase column is the planned upgrade when
+  wanted; would mirror how `christThesis` is stored (see `documents.ts`).
 
 ## Style / working conventions the owner prefers
 - Numbered, click-by-click steps; group commands together.
